@@ -16,9 +16,9 @@ static TRACING: Lazy<()> = Lazy::new(|| {
 pub async fn spawn_app() -> TestApp {
     Lazy::force(&TRACING);
 
-    let env_conf = conf::EnvConf::test();
-
-    let conf = conf::Conf { env: env_conf };
+    let env_conf = conf::EnvConf::test_default();
+    let env = conf::Env::Local;
+    let conf = conf::Conf { env, env_conf };
 
     let application = Application::build(&conf).await;
 

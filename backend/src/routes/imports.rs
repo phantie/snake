@@ -3,7 +3,7 @@
 
 #[allow(unused)]
 pub use crate::{
-    conf::get_env,
+    conf::Env,
     error::{ApiError, ApiResult},
 };
 #[allow(unused)]

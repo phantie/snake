@@ -2,5 +2,4 @@
 # REQUIRES:
 #
 
-host: "127.0.0.1" # for no reason "localhost" has become broken TODO
-
+host: 127.0.0.1

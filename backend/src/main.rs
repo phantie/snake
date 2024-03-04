@@ -1,4 +1,4 @@
-use backend::conf::{self, env_conf, get_env};
+use backend::conf;
 use backend::startup::Application;
 use backend::telemetry;
 
@@ -7,11 +7,16 @@ async fn main() -> hyper::Result<()> {
     let subscriber = telemetry::TracingSubscriber::new("site").build(std::io::stdout);
     telemetry::init_global_default(subscriber);
 
-    let env_conf = env_conf();
+    let env = conf::Env::current();
 
-    tracing::info!("APP_ENVIRONMENT={}", get_env().as_str());
+    let env_conf = conf::EnvConf::current();
 
-    let conf = conf::Conf { env: env_conf };
+    let conf = conf::Conf {
+        env: env.clone(),
+        env_conf: env_conf.clone(),
+    };
+
+    tracing::debug!("Env: {}", env);
 
     let application = Application::build(&conf).await;
 

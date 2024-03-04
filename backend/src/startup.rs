@@ -88,10 +88,10 @@ pub struct Application {
 
 impl Application {
     pub async fn build(conf: &Conf) -> Self {
-        let address = format!("{}:{}", conf.env.host, conf.env.port);
+        let address = format!("{}:{}", conf.env_conf.host, conf.env_conf.port);
         let listener = std::net::TcpListener::bind(&address).unwrap();
         tracing::info!("Listening on http://{}", address);
-        let host = conf.env.host.clone();
+        let host = conf.env_conf.host.clone();
         let port = listener.local_addr().unwrap().port();
 
         return Self {

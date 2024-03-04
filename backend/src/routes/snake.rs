@@ -35,7 +35,6 @@ pub async fn get_lobby(
 }
 
 pub mod ws {
-    use crate::conf::get_env;
     use crate::routes::imports::*;
     use crate::startup::UserConnectInfo;
     use axum::extract::connect_info::ConnectInfo;
@@ -67,7 +66,7 @@ pub mod ws {
         };
 
         let sock_addr = con_info.socket_addr(&headers);
-        if get_env().local() {
+        if Env::current().local() {
             tracing::info!("Client connected to Snake Ws: {:?}", sock_addr);
         } else {
             tracing::info!("Client connected to Snake Ws");

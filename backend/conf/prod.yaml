@@ -1,0 +1,5 @@
+# APP_ENVIRONMENT=prod
+# REQUIRES:
+
+host: 0.0.0.0
+
