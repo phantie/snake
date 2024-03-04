@@ -1,4 +1,4 @@
-use backend::{conf, startup::Application, trace};
+use backend::{conf, server::Application, trace};
 use hyper::StatusCode;
 use once_cell::sync::Lazy;
 use static_routes::*;

@@ -36,7 +36,7 @@ pub async fn get_lobby(
 
 pub mod ws {
     use crate::routes::imports::*;
-    use crate::startup::UserConnectInfo;
+    use crate::server::UserConnectInfo;
     use axum::extract::connect_info::ConnectInfo;
     use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
     use futures_util::{

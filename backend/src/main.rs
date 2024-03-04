@@ -1,5 +1,5 @@
 use backend::conf;
-use backend::startup::Application;
+use backend::server::Application;
 use backend::trace;
 
 #[tokio::main]
@@ -20,7 +20,11 @@ async fn main() -> hyper::Result<()> {
     tracing::debug!("Env: {}", env);
     tracing::debug!("{:?}", env_conf);
 
-    let application = Application::build(&conf).await;
+    // let application = Application::build(&conf).await;
 
-    application.server().await
+    // application.server().await
+
+    let app = Application::build(&conf).await;
+
+    app.server().await
 }
