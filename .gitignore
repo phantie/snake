@@ -1,0 +1,10 @@
+# compiled rust
+**/target/
+
+# VS Code override for workspace
+.vscode/
+
+# temporary dirs
+**/tmp/
+
+**/.direnv/
