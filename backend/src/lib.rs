@@ -1,7 +1,7 @@
 pub mod conf;
 pub mod error;
 pub mod startup;
-pub mod telemetry;
+pub mod trace;
 
 mod mp_snake;
 mod routes;
