@@ -1,0 +1,28 @@
+# https://www.digitalocean.com/community/developer-center/how-to-install-and-configure-ingress-controller-using-nginx
+#
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: snaking
+spec:
+  rules:
+  - host: snake.phantie.site
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: fe
+            port:
+              name: http
+      - path: /api/
+        pathType: Prefix
+        backend:
+          service:
+            name: be
+            port:
+              name: http
+
+  ingressClassName: nginx
+

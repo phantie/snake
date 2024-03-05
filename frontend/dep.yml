@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fe
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fe
+  template:
+    metadata:
+      labels:
+        app: fe
+    spec:
+      containers:
+      - name: fe
+        # TODO
+        # image: registry.digitalocean.com/hort/snake_fe:0.1
+        image: snake_fe:0.1
+        ports:
+        - name: http
+          containerPort: 9000
