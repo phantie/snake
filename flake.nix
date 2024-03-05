@@ -1,9 +1,3 @@
-# nc -U ~/Library/Containers/com.docker.docker/Data/debug-shell.sock
-#
-# docker run -ti --rm ghcr.io/nixos/nix
-#
-# nix build .#dockerImage
-
 {
   description = "Build a cargo project";
 
@@ -40,11 +34,8 @@
 
         inherit (pkgs) lib;
 
-        rustToolchain = pkgs.rust-bin.stable.latest.default.override {
-          # Set the build targets supported by the toolchain,
-          # wasm32-unknown-unknown is required for trunk
-          targets = [ "wasm32-unknown-unknown" ];
-        };
+        rustToolchain = pkgs.pkgsBuildHost.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+
         craneLib = ((crane.mkLib pkgs).overrideToolchain rustToolchain).overrideScope (_final: _prev: {
           # The version of wasm-bindgen-cli needs to match the version in Cargo.lock. You
           # can unpin this if your nixpkgs commit contains the appropriate wasm-bindgen-cli version
@@ -65,12 +56,15 @@
           ;
         };
 
-        # Common arguments can be set here to avoid repeating them later
+
+        # Arguments to be used by both the client and the server
+        # When building a workspace with crane, it's a good idea
+        # to set "pname" and "version".
         commonArgs = {
           inherit src;
+          pname = "trunk-workspace";
+          version = "0.1.0";
           strictDeps = true;
-          # We must force the target, otherwise cargo will attempt to use your native target
-          CARGO_BUILD_TARGET = "wasm32-unknown-unknown";
 
           buildInputs = [
             # Add additional build inputs here
@@ -80,18 +74,44 @@
           ];
         };
 
+        # Native packages
+
+        nativeArgs = commonArgs // {
+          pname = "trunk-workspace-native";
+        };
+
         # Build *just* the cargo dependencies, so we can reuse
         # all of that work (e.g. via cachix) when running in CI
-        cargoArtifacts = craneLib.buildDepsOnly (commonArgs // {
-          # You cannot run cargo test on a wasm build
+        cargoArtifacts = craneLib.buildDepsOnly nativeArgs;
+
+        # Simple JSON API that can be queried by the client
+        myServer = craneLib.buildPackage (nativeArgs // {
+          inherit cargoArtifacts;
+          # The server needs to know where the client's dist dir is to
+          # serve it, so we pass it as an environment variable at build time
+          CLIENT_DIST = myClient;
+        });
+
+        # Wasm packages
+
+        # it's not possible to build the server on the
+        # wasm32 target, so we only build the client.
+        wasmArgs = commonArgs // {
+          pname = "trunk-workspace-wasm";
+          cargoExtraArgs = "--package=frontend";
+          CARGO_BUILD_TARGET = "wasm32-unknown-unknown";
+        };
+
+        cargoArtifactsWasm = craneLib.buildDepsOnly (wasmArgs // {
           doCheck = false;
         });
 
-        # Build the actual crate itself, reusing the dependency
-        # artifacts from above.
+        # Build the frontend of the application.
         # This derivation is a directory you can put on a webserver.
-        my-app = craneLib.buildTrunkPackage (commonArgs // {
-          inherit cargoArtifacts;
+        myClient = craneLib.buildTrunkPackage (wasmArgs // {
+          pname = "trunk-workspace-client";
+          cargoArtifacts = cargoArtifactsWasm;
+          trunkIndexPath = "frontend/index.html";
           # The version of wasm-bindgen-cli here must match the one from Cargo.lock.
           wasm-bindgen-cli = pkgs.wasm-bindgen-cli.override {
             version = "0.2.90";
@@ -99,27 +119,11 @@
             cargoHash = "sha256-ckJxAR20GuVGstzXzIj1M0WBFj5eJjrO2/DRMUK5dwM=";
           };
         });
-
-        # Quick example on how to serve the app,
-        # This is just an example, not useful for production environments
-        serve-app = pkgs.writeShellScriptBin "serve-app" ''
-          ${pkgs.python3Minimal}/bin/python3 -m http.server --directory ${my-app} 9000
-        '';
-
-
-        dockerImage = pkgs.dockerTools.buildImage {
-          name = "snake_fe";
-          tag = "0.1";
-          created = "now";
-          config = {
-            Cmd = [ "${pkgs.python3Minimal}/bin/python3" "-m" "http.server" "9000" "--directory" "${my-app}" ];
-          };
-        };
       in
       {
         checks = {
           # Build the crate as part of `nix flake check` for convenience
-          inherit my-app;
+          inherit myServer myClient;
 
           # Run clippy (and deny all warnings) on the crate source,
           # again, reusing the dependency artifacts from above.
@@ -130,37 +134,31 @@
           my-app-clippy = craneLib.cargoClippy (commonArgs // {
             inherit cargoArtifacts;
             cargoClippyExtraArgs = "--all-targets -- --deny warnings";
+            # Here we don't care about serving the frontend
+            CLIENT_DIST = "";
           });
 
           # Check formatting
-          my-app-fmt = craneLib.cargoFmt {
-            inherit src;
-          };
+          my-app-fmt = craneLib.cargoFmt commonArgs;
         };
 
-        packages =
-          {
-            inherit dockerImage;
-            default = my-app;
-          };
-
         apps.default = flake-utils.lib.mkApp {
-          drv = serve-app;
+          name = "server";
+          drv = myServer;
         };
 
         devShells.default = craneLib.devShell {
           # Inherit inputs from checks.
           checks = self.checks.${system};
 
-          # Additional dev-shell environment variables can be set directly
-          # MY_CUSTOM_DEVELOPMENT_VAR = "something else";
+          shellHook = ''
+            export CLIENT_DIST=$PWD/frontend/dist;
+          '';
 
           # Extra inputs can be added here; cargo and rustc are provided by default.
-          packages = with pkgs; [
-            trunk
-            dive
+          packages = [
+            pkgs.trunk
           ];
         };
-
       });
 }
