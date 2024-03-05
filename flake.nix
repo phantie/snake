@@ -1,3 +1,8 @@
+# nix build .#myServer
+# nix build .#myClient
+# nix build .#FEdockerImage
+# nix build .#BEdockerImage
+#
 {
   description = "Build a cargo project";
 
@@ -121,6 +126,19 @@
           name = "snake_fe";
           tag = "0.1";
           created = "now";
+          # copyToRoot = pkgs.buildEnv {
+          #   name = "image-root";
+          #   paths = with pkgs; [
+          #     bashInteractive
+          #     # ls, etc
+          #     busybox
+          #     # curl
+          #   ];
+          #   pathsToLink = [
+          #     "/bin"
+          #     "/etc"
+          #   ];
+          # };
           config = {
             Cmd = [ "${pkgs.python3Minimal}/bin/python3" "-m" "http.server" "9000" "--directory" "${myClient}" ];
           };
@@ -157,8 +175,9 @@
           checks = self.checks.${system};
 
           # Extra inputs can be added here; cargo and rustc are provided by default.
-          packages = [
-            pkgs.trunk
+          packages = with pkgs; [
+            trunk
+            dive
           ];
         };
 
