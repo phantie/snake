@@ -66,11 +66,11 @@
           version = "0.1.0";
           strictDeps = true;
 
-          buildInputs = [
+          buildInputs = with pkgs; [
             # Add additional build inputs here
           ] ++ lib.optionals pkgs.stdenv.isDarwin [
             # Additional darwin specific inputs can be set here
-            pkgs.libiconv
+            darwin.apple_sdk.frameworks.SystemConfiguration
           ];
         };
 
@@ -89,7 +89,7 @@
           inherit cargoArtifacts;
           # The server needs to know where the client's dist dir is to
           # serve it, so we pass it as an environment variable at build time
-          CLIENT_DIST = myClient;
+          # CLIENT_DIST = myClient;
         });
 
         # Wasm packages
@@ -114,13 +114,38 @@
           trunkIndexPath = "frontend/index.html";
           # The version of wasm-bindgen-cli here must match the one from Cargo.lock.
           wasm-bindgen-cli = pkgs.wasm-bindgen-cli.override {
-            version = "0.2.90";
-            hash = "sha256-X8+DVX7dmKh7BgXqP7Fp0smhup5OO8eWEhn26ODYbkQ=";
-            cargoHash = "sha256-ckJxAR20GuVGstzXzIj1M0WBFj5eJjrO2/DRMUK5dwM=";
+            version = "0.2.89";
+            hash = "sha256-IPxP68xtNSpwJjV2yNMeepAS0anzGl02hYlSTvPocz8=";
+            cargoHash = "sha256-pBeQaG6i65uJrJptZQLuIaCb/WCQMhba1Z1OhYqA8Zc=";
           };
         });
       in
       {
+        packages =
+          {
+            inherit myServer myClient;
+            default = myServer;
+          };
+
+        apps.default = flake-utils.lib.mkApp {
+          name = "server";
+          drv = myServer;
+        };
+
+        devShells.default = craneLib.devShell {
+          # Inherit inputs from checks.
+          checks = self.checks.${system};
+
+          shellHook = ''
+            export CLIENT_DIST=$PWD/frontend/dist;
+          '';
+
+          # Extra inputs can be added here; cargo and rustc are provided by default.
+          packages = [
+            pkgs.trunk
+          ];
+        };
+
         checks = {
           # Build the crate as part of `nix flake check` for convenience
           inherit myServer myClient;
@@ -142,23 +167,5 @@
           my-app-fmt = craneLib.cargoFmt commonArgs;
         };
 
-        apps.default = flake-utils.lib.mkApp {
-          name = "server";
-          drv = myServer;
-        };
-
-        devShells.default = craneLib.devShell {
-          # Inherit inputs from checks.
-          checks = self.checks.${system};
-
-          shellHook = ''
-            export CLIENT_DIST=$PWD/frontend/dist;
-          '';
-
-          # Extra inputs can be added here; cargo and rustc are provided by default.
-          packages = [
-            pkgs.trunk
-          ];
-        };
       });
 }
