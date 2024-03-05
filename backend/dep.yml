@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: be
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: be
+  template:
+    metadata:
+      labels:
+        app: be
+    spec:
+      containers:
+      - name: be
+        # TODO
+        # image: registry.digitalocean.com/hort/snake_be:0.1
+        image: snake_be:0.1
+        ports:
+        - name: http
+          containerPort: 8000

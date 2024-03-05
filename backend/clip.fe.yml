@@ -1,0 +1,19 @@
+# k apply -f clip.fe.yml
+#
+# k delete svc fe
+#
+# curl fe.default
+#
+apiVersion: v1
+kind: Service
+metadata:
+  name: be
+spec:
+  type: ClusterIP
+  selector:
+    app: be
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+    protocol: TCP
