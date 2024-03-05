@@ -87,9 +87,6 @@
         # Simple JSON API that can be queried by the client
         myServer = craneLib.buildPackage (nativeArgs // {
           inherit cargoArtifacts;
-          # The server needs to know where the client's dist dir is to
-          # serve it, so we pass it as an environment variable at build time
-          # CLIENT_DIST = myClient;
         });
 
         # Wasm packages
@@ -119,12 +116,35 @@
             cargoHash = "sha256-pBeQaG6i65uJrJptZQLuIaCb/WCQMhba1Z1OhYqA8Zc=";
           };
         });
+
+        FEdockerImage = pkgs.dockerTools.buildImage {
+          name = "snake_fe";
+          tag = "0.1";
+          created = "now";
+          config = {
+            Cmd = [ "${pkgs.python3Minimal}/bin/python3" "-m" "http.server" "9000" "--directory" "${myClient}" ];
+          };
+        };
+
+        BEdockerImage = pkgs.dockerTools.buildImage
+          {
+            name = "snake_be";
+            tag = "0.1";
+            created = "now";
+            config = {
+              Cmd = [ "${myServer}/bin/backend" ];
+              Env = [
+                "BE__ENV=prod"
+                "BE__CONF_DIR=${./backend/conf}"
+              ];
+            };
+          };
       in
       {
         packages =
           {
-            inherit myServer myClient;
-            default = myServer;
+            inherit myServer myClient FEdockerImage BEdockerImage;
+            default = myClient;
           };
 
         apps.default = flake-utils.lib.mkApp {
@@ -135,10 +155,6 @@
         devShells.default = craneLib.devShell {
           # Inherit inputs from checks.
           checks = self.checks.${system};
-
-          shellHook = ''
-            export CLIENT_DIST=$PWD/frontend/dist;
-          '';
 
           # Extra inputs can be added here; cargo and rustc are provided by default.
           packages = [
@@ -159,8 +175,6 @@
           my-app-clippy = craneLib.cargoClippy (commonArgs // {
             inherit cargoArtifacts;
             cargoClippyExtraArgs = "--all-targets -- --deny warnings";
-            # Here we don't care about serving the frontend
-            CLIENT_DIST = "";
           });
 
           # Check formatting
