@@ -26,7 +26,7 @@ pub fn file_response(file: &File) -> axum::response::Response {
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 
 #[derive(Debug)]
 pub struct File {
@@ -36,17 +36,29 @@ pub struct File {
     pub modified: std::time::SystemTime,
 }
 
-#[derive(Default, Debug, Clone, derived_deref::Deref)]
+#[derive(Debug, Clone, derived_deref::Deref)]
 pub struct Cache {
     #[target]
-    request_path_to_file: Arc<RwLock<HashMap<String, Arc<File>>>>,
+    request_path_to_file: Arc<Mutex<clru::CLruCache<String, Arc<File>>>>,
+    // no lru, all files cached to memory
     disk_path_to_file: Arc<RwLock<HashMap<Box<std::path::PathBuf>, Arc<File>>>>,
+}
+
+impl Default for Cache {
+    fn default() -> Self {
+        Self {
+            request_path_to_file: Arc::new(Mutex::new(clru::CLruCache::new(
+                std::num::NonZeroUsize::new(30).unwrap(),
+            ))),
+            disk_path_to_file: Default::default(),
+        }
+    }
 }
 
 impl Cache {
     pub async fn get_request_path(&self, path: &str) -> Option<Arc<File>> {
         self.request_path_to_file
-            .read()
+            .lock()
             .await
             .get(path)
             .map(Clone::clone)
@@ -62,9 +74,9 @@ impl Cache {
 
     pub async fn insert(&self, path: String, file: Arc<File>) {
         self.request_path_to_file
-            .write()
+            .lock()
             .await
-            .insert(path, file.clone());
+            .put(path, file.clone());
         self.disk_path_to_file
             .write()
             .await

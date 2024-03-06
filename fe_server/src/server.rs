@@ -114,7 +114,9 @@ mod routing {
 
                 #[allow(unused)]
                 let display_cache_keys = async {
-                    tracing::warn!("cache keys: {:?}", cache.read().await.keys());
+                    let lock = cache.lock().await;
+                    let keys = lock.iter().map(|(k, _)| k).collect::<Vec<_>>();
+                    tracing::warn!("cache keys: {keys:?}");
                 };
 
                 match file {
@@ -140,7 +142,7 @@ mod routing {
                         response
                     }
                     Some(cached) => {
-                        tracing::info!("cache hit on file path: {file_path:?}");
+                        tracing::warn!("cache hit on file path: {file_path:?}");
                         // do not go to disk, reuse cached value
                         cache.insert(request_path, cached.clone()).await;
                         // display_cache_keys.await;
