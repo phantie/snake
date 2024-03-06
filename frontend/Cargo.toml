@@ -9,22 +9,25 @@ edition = "2021"
 interfacing = { path = "../common/interfacing" }
 static_routes = { path = "../common/static_routes" }
 
+serde.workspace = true
+serde_json.workspace = true
+
+# Must match version in flake.nix
+wasm-bindgen = "=0.2.89"
+
 gloo-console = "0.2.3"
 gloo-net = { version = "0.2.6", features = ["websocket"] }
+gloo-storage = "0.2.2"
+gloo-timers = "0.3.0"
+gloo-events = "0.2.0"
+gloo-utils = "0.2.0"
+
 stylist = { version = "0.12.0", features = ["yew", "parser"] }
 yew = { version = "0.20.0", features = ["csr"] }
 yew-router = "0.17.0"
 thiserror = "1.0.40"
-gloo-storage = "0.2.2"
-serde = { version = "1.0.183", default-features = false, features = ["derive"] }
-serde_json = "1.0.94"
 anyhow = "1.0.71"
 futures = "0.3.28"
-# Must match version in flake.nix
-wasm-bindgen = "=0.2.89"
-gloo-timers = "0.3.0"
-gloo-events = "0.2.0"
-gloo-utils = "0.2.0"
 js-sys = "0.3.64"
 wasm-bindgen-futures = "0.4.37"
 derivative = "2.2.0"
