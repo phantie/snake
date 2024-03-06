@@ -62,30 +62,36 @@ mod routing {
     use super::*;
     use axum::routing::get;
     use axum::routing::Router;
+    use tower_http::add_extension::AddExtensionLayer;
 
     mod routes {
         pub mod fallback {
             use std::io::Read;
 
-            use axum::response::IntoResponse;
+            use axum::{body::HttpBody, response::IntoResponse, Extension};
 
             use crate::serve_files::*;
 
-            pub async fn fallback(uri: axum::http::Uri) -> axum::response::Response {
-                let relative_file_path = {
-                    let relative_file_path = uri.to_string();
-                    relative_file_path
-                        .trim_start_matches('/')
-                        .trim()
-                        .to_string()
+            pub async fn fallback(
+                uri: axum::http::Uri,
+                Extension(cache): Extension<crate::serve_files::Cache>,
+            ) -> axum::response::Response {
+                let request_path = {
+                    let request_path = uri.to_string();
+                    request_path.trim_start_matches('/').trim().to_string()
                 };
 
                 use crate::conf;
 
                 let conf = conf::EnvConf::current();
 
+                if let Some(file) = cache.get_request_path(&request_path).await {
+                    tracing::info!("cache hit for request path: {request_path:?}");
+                    return file_response(&file);
+                }
+
                 let dir = std::path::Path::new(&conf.dir);
-                let file_path = dir.join(relative_file_path);
+                let file_path = dir.join(request_path.clone());
 
                 let (file_path) = if file_path.is_file() {
                     file_path
@@ -104,15 +110,43 @@ mod routing {
                     }
                 };
 
-                let mut file = std::fs::File::open(&file_path).expect("opens when exists");
+                let file = cache.get_disk_path(&file_path).await;
 
-                // tracing::info!("sending file {:?}", file_path);
+                #[allow(unused)]
+                let display_cache_keys = async {
+                    tracing::warn!("cache keys: {:?}", cache.read().await.keys());
+                };
 
-                let modified = file.metadata().unwrap().modified().unwrap();
-                let mut contents = vec![];
-                file.read_to_end(&mut contents);
+                match file {
+                    None => {
+                        tracing::warn!("cache miss on file path: {file_path:?}");
+                        let process_file = |mut file: std::fs::File| {
+                            let modified = file.metadata().unwrap().modified().unwrap();
+                            let mut contents = vec![];
+                            file.read_to_end(&mut contents);
+                            File {
+                                contents,
+                                path: Box::new(file_path.clone()),
+                                request_path: request_path.clone(),
+                                modified,
+                            }
+                        };
 
-                file_response(contents, file_path, modified)
+                        let mut file = std::fs::File::open(&file_path).expect("opens when exists");
+                        let file = process_file(file);
+                        let response = file_response(&file);
+                        cache.insert(request_path, std::sync::Arc::new(file)).await;
+                        // display_cache_keys.await;
+                        response
+                    }
+                    Some(cached) => {
+                        tracing::info!("cache hit on file path: {file_path:?}");
+                        // do not go to disk, reuse cached value
+                        cache.insert(request_path, cached.clone()).await;
+                        // display_cache_keys.await;
+                        file_response(&cached)
+                    }
+                }
             }
         }
 
@@ -128,6 +162,7 @@ mod routing {
         Router::new()
             .nest("/api", api_router)
             .fallback(routes::fallback::fallback)
+            .layer(AddExtensionLayer::new(crate::serve_files::Cache::default()))
             .layer(crate::trace::request_trace_layer())
     }
 }

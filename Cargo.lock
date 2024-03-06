@@ -546,6 +546,7 @@ dependencies = [
  "bytes",
  "config",
  "derive_more",
+ "derived-deref",
  "envtestkit",
  "httpdate",
  "hyper",

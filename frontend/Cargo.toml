@@ -11,6 +11,7 @@ static_routes = { path = "../common/static_routes" }
 
 serde.workspace = true
 serde_json.workspace = true
+derived-deref.workspace = true
 
 # Must match version in flake.nix
 wasm-bindgen = "=0.2.89"
@@ -32,7 +33,6 @@ js-sys = "0.3.64"
 wasm-bindgen-futures = "0.4.37"
 derivative = "2.2.0"
 tokio = { version = "1.35.1", default-features = false, features = ["sync"] }
-derived-deref = "2.1.0"
 
 [dependencies.web-sys]
 version = "0.3.61"

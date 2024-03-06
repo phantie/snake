@@ -19,6 +19,7 @@ serde.workspace = true
 serde_json.workspace = true
 axum.workspace = true
 derive_more.workspace = true
+derived-deref.workspace = true
 
 bytes = "1.5.0"
 httpdate = "1.0.3"
