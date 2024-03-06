@@ -1,0 +1,5 @@
+# FE_SRV__ENV=local
+# REQUIRES:
+#
+
+host: 127.0.0.1

@@ -97,7 +97,7 @@
 
         FEServer = craneLib.buildPackage (nativeArgs // {
           inherit cargoArtifacts;
-          cargoExtraArgs = "--package=server";
+          cargoExtraArgs = "--package=fe_server";
         });
 
         # Wasm packages
@@ -146,10 +146,10 @@
           #   ];
           # };
           config = {
-            Cmd = [ "${FEServer}/bin/server" ];
+            Cmd = [ "${FEServer}/bin/fe_server" ];
             Env = [
               "FE_SRV__ENV=prod"
-              "FE_SRV__CONF_DIR=${./server/conf}"
+              "FE_SRV__CONF_DIR=${./fe_server/conf}"
               "FE_SRV__DIR=${myClient}"
               "FE_SRV__FALLBACK=${myClient}/index.html"
             ];
@@ -184,7 +184,7 @@
           };
 
         apps.default = flake-utils.lib.mkApp {
-          name = "server";
+          name = "backend";
           drv = myServer;
         };
 

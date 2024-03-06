@@ -6,6 +6,10 @@ use serde_aux::field_attributes::deserialize_number_from_string;
 
 static ENV_PREFIX: &str = "FE_SRV";
 
+fn prefixed_env(suffix: &str) -> String {
+    format!("{}__{}", ENV_PREFIX, suffix)
+}
+
 #[derive(Clone)]
 pub struct Conf {
     pub env_conf: EnvConf,
@@ -29,7 +33,7 @@ pub struct Log {
 
 impl EnvConf {
     pub fn current() -> Self {
-        fn conf_path(conf_dir: &std::path::PathBuf, filename: &str) -> String {
+        fn join_filename(conf_dir: &std::path::PathBuf, filename: &str) -> String {
             conf_dir
                 .join(filename)
                 .into_os_string()
@@ -37,15 +41,20 @@ impl EnvConf {
                 .unwrap()
         }
 
-        let base_path = std::env::current_dir().unwrap();
-
-        let conf_dir = base_path.join("conf");
-        let env = Env::current();
+        let conf_dir = std::env::var(prefixed_env("CONF_DIR"))
+            .map(|v| std::path::PathBuf::from(v))
+            .unwrap_or_else(|_| {
+                let base_path = std::env::current_dir().unwrap();
+                base_path.join("conf")
+            });
 
         let conf_builder = config::Config::builder()
-            .add_source(config::File::with_name(&conf_path(&conf_dir, "default")).required(true))
             .add_source(
-                config::File::with_name(&conf_path(&conf_dir, env.as_ref())).required(false),
+                config::File::with_name(&join_filename(&conf_dir, "default")).required(true),
+            )
+            .add_source(
+                config::File::with_name(&join_filename(&conf_dir, Env::current().as_ref()))
+                    .required(false),
             )
             .add_source(config::Environment::with_prefix(ENV_PREFIX).separator("__"))
             .build();
@@ -65,7 +74,7 @@ impl EnvConf {
     pub fn test_default() -> Self {
         Self {
             port: 0,
-            dir: "".to_string(), // TODO handle
+            dir: "".to_string(), // TODO
             fallback: None,
             host: "127.0.0.1".into(),
             log: Log { pretty: false },
@@ -90,7 +99,7 @@ impl Env {
         let hort_env = std::env::var("HORT_ENV").unwrap_or_else(|_| "local".into());
 
         // Or set a more specific per executable
-        std::env::var(format!("{}_ENV", ENV_PREFIX))
+        std::env::var(prefixed_env("ENV"))
             .unwrap_or(hort_env)
             .try_into()
             .expect("valid variable")
@@ -160,7 +169,7 @@ mod tests {
 
                 let _2 = self
                     .local_env
-                    .map(|env| set_env(format!("{}_ENV", ENV_PREFIX).into(), env));
+                    .map(|env| set_env(prefixed_env("ENV").into(), env));
 
                 match &self.result {
                     #[allow(unused)]

@@ -566,6 +566,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "25cbce373ec4653f1a01a31e8a5e5ec0c622dc27ff9c4e6606eefef5cbbed4a5"
 
 [[package]]
+name = "fe_server"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "bytes",
+ "config",
+ "derive_more",
+ "envtestkit",
+ "httpdate",
+ "hyper",
+ "include_dir",
+ "mime_guess",
+ "reqwest",
+ "serde",
+ "serde-aux",
+ "tokio",
+ "tower",
+ "tower-http",
+ "tracing",
+ "tracing-log",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "flate2"
 version = "1.0.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1948,30 +1972,6 @@ dependencies = [
  "itoa",
  "ryu",
  "serde",
-]
-
-[[package]]
-name = "server"
-version = "0.1.0"
-dependencies = [
- "axum",
- "bytes",
- "config",
- "derive_more",
- "envtestkit",
- "httpdate",
- "hyper",
- "include_dir",
- "mime_guess",
- "reqwest",
- "serde",
- "serde-aux",
- "tokio",
- "tower",
- "tower-http",
- "tracing",
- "tracing-log",
- "tracing-subscriber",
 ]
 
 [[package]]

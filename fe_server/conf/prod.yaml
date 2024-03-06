@@ -1,0 +1,5 @@
+# FE_SRV__ENV=prod
+# REQUIRES:
+
+host: 0.0.0.0
+
