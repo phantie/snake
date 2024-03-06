@@ -48,7 +48,7 @@ impl Default for Cache {
     fn default() -> Self {
         Self {
             request_path_to_file: Arc::new(Mutex::new(clru::CLruCache::new(
-                std::num::NonZeroUsize::new(30).unwrap(),
+                crate::conf::EnvConf::current().request_path_lru_size,
             ))),
             disk_path_to_file: Default::default(),
         }

@@ -24,7 +24,7 @@ pub struct EnvConf {
     pub dir: String,
     pub fallback: Option<String>,
     #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub request_path_lru_size: u32,
+    pub request_path_lru_size: std::num::NonZeroUsize,
     pub log: Log,
 }
 
@@ -78,7 +78,7 @@ impl EnvConf {
             port: 0,
             dir: "".to_string(), // TODO
             fallback: None,
-            request_path_lru_size: 30,
+            request_path_lru_size: std::num::NonZeroUsize::new(30).unwrap(),
             host: "127.0.0.1".into(),
             log: Log { pretty: false },
         }

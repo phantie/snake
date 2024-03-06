@@ -122,19 +122,21 @@ mod routing {
                 match file {
                     None => {
                         tracing::warn!("cache miss on file path: {file_path:?}");
+
+                        let mut file = std::fs::File::open(&file_path).expect("opens when exists");
+
                         let process_file = |mut file: std::fs::File| {
                             let modified = file.metadata().unwrap().modified().unwrap();
                             let mut contents = vec![];
                             file.read_to_end(&mut contents);
                             File {
                                 contents,
-                                path: Box::new(file_path.clone()),
+                                path: Box::new(file_path),
                                 request_path: request_path.clone(),
                                 modified,
                             }
                         };
 
-                        let mut file = std::fs::File::open(&file_path).expect("opens when exists");
                         let file = process_file(file);
                         let response = file_response(&file);
                         cache.insert(request_path, std::sync::Arc::new(file)).await;
