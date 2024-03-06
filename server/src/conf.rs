@@ -65,8 +65,8 @@ impl EnvConf {
     pub fn test_default() -> Self {
         Self {
             port: 0,
-            dir: unimplemented!(),
-            fallback: unimplemented!(),
+            dir: "".to_string(), // TODO handle
+            fallback: None,
             host: "127.0.0.1".into(),
             log: Log { pretty: false },
         }

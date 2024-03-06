@@ -92,6 +92,12 @@
         # Simple JSON API that can be queried by the client
         myServer = craneLib.buildPackage (nativeArgs // {
           inherit cargoArtifacts;
+          cargoExtraArgs = "--package=backend";
+        });
+
+        FEServer = craneLib.buildPackage (nativeArgs // {
+          inherit cargoArtifacts;
+          cargoExtraArgs = "--package=server";
         });
 
         # Wasm packages
@@ -140,7 +146,13 @@
           #   ];
           # };
           config = {
-            Cmd = [ "${pkgs.python3Minimal}/bin/python3" "-m" "http.server" "9000" "--directory" "${myClient}" ];
+            Cmd = [ "${FEServer}/bin/server" ];
+            Env = [
+              "FE_SRV__ENV=prod"
+              "FE_SRV__CONF_DIR=${./server/conf}"
+              "FE_SRV__DIR=${myClient}"
+              "FE_SRV__FALLBACK=${myClient}/index.html"
+            ];
           };
         };
 
@@ -161,7 +173,13 @@
       {
         packages =
           {
-            inherit myServer myClient FEdockerImage BEdockerImage;
+            inherit
+              myServer
+              myClient
+              FEdockerImage
+              BEdockerImage
+              # FEServer
+              ;
             default = myClient;
           };
 
