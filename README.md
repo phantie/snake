@@ -12,6 +12,9 @@ Deployed on kubernetes. Dev environment and docker images built by Nix. Compiled
 ### Backend
 Performant concurrent event handling on asynchronous multi-threaded tokio runtime, similar to Erlang's light-weight processes.
 
+### Frontend
+Based on SPA application framework similar to React. Custom theme support (click right top corner).
+
 ### Messages
 Frontend and backend reuse message schemas, compile-time checked. Request/response model over Websockets implemented for frontend and backend. Reliable communication provided by request/response model (acknowledgements), idempotency and (potentially) request retries.
 
