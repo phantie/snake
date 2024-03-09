@@ -496,35 +496,6 @@ impl Component for Snake {
                             let lobby_name =
                                 self.ws_state.joined_lobby_name.as_ref().expect("to exist");
 
-                            // TODO make request to server
-                            pub async fn get_lobby(
-                                name: String,
-                            ) -> Result<interfacing::snake::GetLobby, ()>
-                            {
-                                let response = Request::get(&format!("/api/snake/lobby/{}", name))
-                                    .send()
-                                    .await
-                                    .unwrap(); // TODO handle
-
-                                match response.status() {
-                                    200 => Ok(response
-                                        .json::<interfacing::snake::GetLobby>()
-                                        .await
-                                        .unwrap()), // TODO handle
-                                    _ => unimplemented!(), // TODO handle
-                                }
-                            }
-
-                            // {
-                            //     let name = name.clone();
-                            //     ctx.link().send_future(async move {
-                            //         match get_lobby(name.clone()).await {
-                            //             Ok(lobby) => unimplemented!(),
-                            //             Err(_e) => Self::Message::Nothing,
-                            //         }
-                            //     });
-                            // }
-
                             let block = match ls {
                                 LobbyState::Prep(LobbyPrep { participants }) => {
                                     let onclick = ctx.link().callback(move |e| {
@@ -638,52 +609,17 @@ impl Component for Snake {
                 } => {
                     let name_ref = NodeRef::default();
 
-                    async fn post_lobby(
-                        form: &interfacing::snake::CreateLobby,
-                    ) -> request::SendResult {
-                        Request::post("/api/snake/lobby")
-                            .json(&form)
-                            .unwrap()
-                            .send()
-                            .await
-                    }
-
                     let onsubmit = {
                         let name_ref = name_ref.clone();
 
-                        ctx.link().callback_future(move |event: SubmitEvent| {
+                        ctx.link().callback(move |event: SubmitEvent| {
                             event.prevent_default();
 
                             let name = name_ref.cast::<HtmlInputElement>().unwrap().value();
 
-                            let form = interfacing::snake::CreateLobby { name: name.clone() };
-
-                            async move {
-                                console::log!(format!("submitting: {:?}", form));
-                                let r = post_lobby(&form).await.unwrap();
-                                r.log_status();
-
-                                match r.status() {
-                                    200 => {
-                                        console::log!("lobby created");
-
-                                        Self::Message::RedirectToLobby { lobby_name: name }
-                                        // Self::Message::StateChange(State::NotBegun {
-                                        //     inner: NotBegunState::MPPrejoinLobby {
-                                        //         lobby_name: form.name,
-                                        //     },
-                                        // })
-                                    }
-                                    // TODO handle errors for validation
-                                    409 => {
-                                        web_sys::window().unwrap().alert_with_message(
-                                            "Lobby with this name already exists",
-                                        );
-                                        Self::Message::Nothing
-                                    }
-                                    _ => unimplemented!(),
-                                }
-                            }
+                            Self::Message::WsSend("create-lobby".pinned_msg(
+                                interfacing::snake::WsClientMsg::CreateLobby(name.clone()),
+                            ))
                         })
                     };
 
@@ -2257,6 +2193,18 @@ impl Snake {
                 // TODO decouple action to take somehow
                 //
                 match (ack_msg, msg) {
+                    (WsClientMsg::CreateLobby(value), WsServerMsg::Ack) => {
+                        ctx.link().send_message(SnakeMsg::RedirectToLobby {
+                            lobby_name: value.clone(),
+                        });
+                    }
+
+                    (WsClientMsg::CreateLobby(value), WsServerMsg::Err(msg)) => {
+                        web_sys::window()
+                            .unwrap()
+                            .alert_with_message("Lobby with this name already exists");
+                    }
+
                     (WsClientMsg::LobbyList, WsServerMsg::LobbyList(lobby_list)) => {
                         if let State::NotBegun {
                             inner: NotBegunState::MPLobbyList { lobbies },

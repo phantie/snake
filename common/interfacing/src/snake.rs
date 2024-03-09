@@ -24,6 +24,7 @@ pub type MaybeMsgId = Option<MsgId>;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum WsClientMsg {
+    CreateLobby(LobbyName),
     SetUserName(UserName),
     UserName,
     JoinLobby(LobbyName),
