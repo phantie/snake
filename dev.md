@@ -75,3 +75,6 @@
     k get deploy be fe
     k get svc be fe
     k get ing snaking
+
+#### Route external traffic to Ingress Controller
+[Guide](https://www.digitalocean.com/community/developer-center/how-to-install-and-configure-ingress-controller-using-nginx)
