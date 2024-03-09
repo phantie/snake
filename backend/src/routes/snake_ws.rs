@@ -293,8 +293,11 @@ async fn handle_received_message(
             CreateLobby(_) | JoinLobby(_) | UserName | LobbyList | SetUserName(_) | VoteStart(_)
             | LeaveLobby,
         ) => {
-            // TODO do not panic in prod
-            unreachable!("ack expected")
+            if Env::current().prod() {
+                tracing::info!("ack expected")
+            } else {
+                unreachable!("ack expected")
+            }
         }
     }
 }
