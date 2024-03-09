@@ -84,9 +84,11 @@ mod routing {
         Router::new()
             .nest("/api", api_router)
             .layer(CompressionLayer::new())
-            .layer(AddExtensionLayer::new(crate::mp_snake::Lobbies::default()))
             .layer(AddExtensionLayer::new(
-                crate::mp_snake::PlayerUserNames::default(),
+                crate::mp::lobby::lobbies::Lobbies::default(),
+            ))
+            .layer(AddExtensionLayer::new(
+                crate::mp::lobby::usernames::PlayerUserNames::default(),
             ))
             .layer(crate::trace::request_trace_layer())
     }

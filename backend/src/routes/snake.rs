@@ -1,4 +1,4 @@
-use crate::mp_snake::{Lobbies, Lobby};
+use crate::mp::lobby::{lobbies::Lobbies, lobby::Lobby};
 use crate::routes::imports::*;
 
 // for debugging
@@ -37,8 +37,10 @@ pub async fn get_lobby(
 pub mod ws {
     use crate::routes::imports::*;
     use crate::server::UserConnectInfo;
-    use axum::extract::connect_info::ConnectInfo;
-    use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
+    use axum::extract::{
+        connect_info::ConnectInfo,
+        ws::{Message, WebSocket, WebSocketUpgrade},
+    };
     use futures_util::{
         sink::SinkExt,
         stream::{SplitSink, SplitStream, StreamExt},
@@ -47,7 +49,14 @@ pub mod ws {
     use std::sync::Arc;
     use tokio::sync::{mpsc, Mutex};
 
-    use crate::mp_snake::{ws::State, Con, JoinLobbyError, Lobbies, PlayerUserNames};
+    use crate::mp::{
+        con_state::ConState,
+        lobby::{
+            lobbies::{JoinLobbyError, Lobbies},
+            usernames::PlayerUserNames,
+        },
+        Con,
+    };
 
     pub async fn ws(
         maybe_ws: Result<WebSocketUpgrade, axum::extract::ws::rejection::WebSocketUpgradeRejection>,
@@ -84,9 +93,9 @@ pub mod ws {
 
     async fn handle_socket(socket: WebSocket, con: Con, lobbies: Lobbies, uns: PlayerUserNames) {
         let con_state = {
-            let mut state = State::default();
+            let mut con_state = ConState::default();
 
-            state.user_name = if super::AUTO_GEN_USER_NAME {
+            con_state.un = if super::AUTO_GEN_USER_NAME {
                 let un = format!("Player {con}");
                 // do not handle possible collision, since it's debug only feature
                 uns.try_insert(un.clone(), con).await.unwrap();
@@ -95,7 +104,7 @@ pub mod ws {
                 None
             };
 
-            Arc::new(Mutex::new(state))
+            Arc::new(Mutex::new(con_state))
         };
 
         let (server_msg_sender, server_msg_receiver) = mpsc::unbounded_channel::<ServerMsg>();
@@ -128,7 +137,7 @@ pub mod ws {
 
     async fn read(
         mut receiver: SplitStream<WebSocket>,
-        con_state: Arc<Mutex<State>>,
+        con_state: Arc<Mutex<ConState>>,
         server_msg_sender: mpsc::UnboundedSender<ServerMsg>,
         lobbies: Lobbies,
         con: Con,
@@ -169,7 +178,7 @@ pub mod ws {
 
     async fn handle_received_message(
         msg: ClientMsg,
-        con_state: Arc<Mutex<State>>,
+        con_state: Arc<Mutex<ConState>>,
         server_msg_sender: mpsc::UnboundedSender<ServerMsg>,
         lobbies: Lobbies,
         con: Con,
@@ -187,7 +196,7 @@ pub mod ws {
                 } else {
                     match uns.try_insert(value.clone(), con).await {
                         Ok(()) => {
-                            con_state.lock().await.user_name.replace(value);
+                            con_state.lock().await.un.replace(value);
                             WsServerMsg::Ack
                         }
                         Err(()) => interfacing::snake::WsServerMsg::UserNameOccupied,
@@ -197,15 +206,15 @@ pub mod ws {
             }
 
             WsMsg(Some(id), UserName) => {
-                let user_name = con_state.lock().await.user_name.clone();
-                let send = interfacing::snake::WsServerMsg::UserName(user_name);
+                let un = con_state.lock().await.un.clone();
+                let send = interfacing::snake::WsServerMsg::UserName(un);
                 server_msg_sender.send(id.pinned_msg(send)).unwrap();
             }
 
             WsMsg(Some(id), JoinLobby(lobby_name)) => {
                 use interfacing::snake::JoinLobbyDecline;
 
-                let send = match &con_state.lock().await.user_name {
+                let send = match &con_state.lock().await.un {
                     None => interfacing::snake::WsServerMsg::JoinLobbyDecline(
                         interfacing::snake::JoinLobbyDecline::UserNameNotSet,
                     ),
@@ -217,15 +226,14 @@ pub mod ws {
                             Ok(s) => WsServerMsg::LobbyState(s),
 
                             Err(e) => {
-                                // TODO impl From
+                                use JoinLobbyError::*;
+                                // TODO impl From or use the same datastructure
                                 let e = match e {
-                                    JoinLobbyError::NotFound => JoinLobbyDecline::NotFound,
-                                    JoinLobbyError::AlreadyJoined(lobby_name) => {
+                                    NotFound => JoinLobbyDecline::NotFound,
+                                    AlreadyJoined(lobby_name) => {
                                         JoinLobbyDecline::AlreadyJoined(lobby_name)
                                     }
-                                    JoinLobbyError::AlreadyStarted => {
-                                        JoinLobbyDecline::AlreadyStarted
-                                    }
+                                    AlreadyStarted => JoinLobbyDecline::AlreadyStarted,
                                 };
                                 WsServerMsg::JoinLobbyDecline(e)
                             }
