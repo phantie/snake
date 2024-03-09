@@ -18,6 +18,9 @@ Based on SPA application framework similar to React. Custom theme support (click
 ### Messages
 Frontend and backend reuse message schemas, compile-time checked. Request/response model over Websockets implemented for frontend and backend. Reliable communication provided by request/response model (acknowledgements), idempotency and (potentially) request retries.
 
+### Development guide
+Refer to dev.md
+
 ### Optimizations
 #### Space efficient ser/de for snake form
 Reduces required space for snake form ser/de by encoding directions intead of positions after initial position. \
@@ -25,5 +28,7 @@ Old payload: {pos1 pos2 pos3} \
 New payload: {pos1 dir1 dir2} \
 Position as json is {"x":x,"y":y} taking 11 + 2 * (1 to 5 (1 for possible minus sign)) bytes = 13 to 21 bytes. Encoded position as a direction takes 2 bits. Resulting in space efficiency per position increased by up to (max(13, 21) * 8) / 2 = 84 times.
 
-### Development guide
-Refer to dev.md
+### Room for improvement
+- State reconciliation using partial update, instead of pushing full state to client on server update. Goal: smaller payloads.
+- Compress messages, for example, leaving field names out of payloads. Goal: smaller payloads.
+- Root frontend component refactoring. Goal: reduce technical debt.
