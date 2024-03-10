@@ -2,7 +2,11 @@
 //
 
 use serde::Deserialize;
-use serde_aux::field_attributes::deserialize_number_from_string;
+use serde_aux::field_attributes::deserialize_number_from_string as de_num;
+
+lazy_static::lazy_static! {
+    static ref CURRENT_ENV: EnvConf = EnvConf::derive();
+}
 
 static ENV_PREFIX: &str = "FE_SRV";
 
@@ -18,12 +22,12 @@ pub struct Conf {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct EnvConf {
-    #[serde(deserialize_with = "deserialize_number_from_string")]
+    #[serde(deserialize_with = "de_num")]
     pub port: u16,
     pub host: String,
     pub dir: String,
     pub fallback: Option<String>,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
+    #[serde(deserialize_with = "de_num")]
     pub request_path_lru_size: std::num::NonZeroUsize,
     pub log: Log,
 }
@@ -34,7 +38,7 @@ pub struct Log {
 }
 
 impl EnvConf {
-    pub fn current() -> Self {
+    pub fn derive() -> Self {
         fn join_filename(conf_dir: &std::path::PathBuf, filename: &str) -> String {
             conf_dir
                 .join(filename)
@@ -70,6 +74,10 @@ impl EnvConf {
                 Err(e).expect("correct config")
             }
         }
+    }
+
+    pub fn current() -> &'static Self {
+        &CURRENT_ENV
     }
 
     #[allow(unused)] // RA bug

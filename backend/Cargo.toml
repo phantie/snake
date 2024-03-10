@@ -31,6 +31,7 @@ axum.workspace = true
 derive_more.workspace = true
 strum.workspace = true
 derived-deref.workspace = true
+lazy_static.workspace = true
 
 thiserror = "1.0.39"
 futures-util = "0.3.28"

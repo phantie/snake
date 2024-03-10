@@ -20,12 +20,14 @@ serde_json.workspace = true
 axum.workspace = true
 derive_more.workspace = true
 derived-deref.workspace = true
+lazy_static.workspace = true
 
 bytes = "1.5.0"
 httpdate = "1.0.3"
 include_dir = { version = "0.7.3", features = ["metadata"] }
 mime_guess = "2.0.4"
 clru = "0.6.1"
+
 
 [dev-dependencies]
 reqwest.workspace = true
