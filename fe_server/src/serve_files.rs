@@ -44,12 +44,10 @@ pub struct Cache {
     disk_path_to_file: Arc<RwLock<HashMap<Box<std::path::PathBuf>, Arc<File>>>>,
 }
 
-impl Default for Cache {
-    fn default() -> Self {
+impl Cache {
+    pub fn new(request_path_lru_size: std::num::NonZeroUsize) -> Self {
         Self {
-            request_path_to_file: Arc::new(Mutex::new(clru::CLruCache::new(
-                crate::conf::EnvConf::current().request_path_lru_size,
-            ))),
+            request_path_to_file: Arc::new(Mutex::new(clru::CLruCache::new(request_path_lru_size))),
             disk_path_to_file: Default::default(),
         }
     }

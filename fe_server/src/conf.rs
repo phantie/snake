@@ -1,15 +1,9 @@
 // Configuration definitions, functions and tests
 //
-// TODO fix TestApp::spawn_app() requiring DIR env var
 
 use serde::Deserialize;
 use serde_aux::field_attributes::deserialize_number_from_string as de_num;
-
-#[cfg(not(test))]
-lazy_static::lazy_static! {
-    static ref ENV_CONF: EnvConf = EnvConf::derive();
-    static ref ENV: Env = Env::derive();
-}
+use std::sync::Arc;
 
 static ENV_PREFIX: &str = "FE_SRV";
 
@@ -17,10 +11,20 @@ fn prefixed_env(suffix: &str) -> String {
     format!("{}__{}", ENV_PREFIX, suffix)
 }
 
-#[derive(Clone)]
+#[derive(Clone, derived_deref::Deref)]
 pub struct Conf {
-    pub env_conf: EnvConf,
+    #[target]
+    pub env_conf: Arc<EnvConf>,
     pub env: Env,
+}
+
+impl Conf {
+    pub fn new(env: Env, env_conf: EnvConf) -> Self {
+        Self {
+            env_conf: Arc::new(env_conf),
+            env,
+        }
+    }
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -29,10 +33,10 @@ pub struct EnvConf {
     pub port: u16,
     pub host: String,
     pub dir: String,
+    pub log: Log,
     pub fallback: Option<String>,
     #[serde(deserialize_with = "de_num")]
     pub request_path_lru_size: std::num::NonZeroUsize,
-    pub log: Log,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -41,7 +45,7 @@ pub struct Log {
 }
 
 impl EnvConf {
-    pub fn derive() -> Self {
+    pub fn derive(env: Env) -> Self {
         fn join_filename(conf_dir: &std::path::PathBuf, filename: &str) -> String {
             conf_dir
                 .join(filename)
@@ -62,8 +66,7 @@ impl EnvConf {
                 config::File::with_name(&join_filename(&conf_dir, "default")).required(true),
             )
             .add_source(
-                config::File::with_name(&join_filename(&conf_dir, Env::current().as_ref()))
-                    .required(false),
+                config::File::with_name(&join_filename(&conf_dir, env.as_ref())).required(false),
             )
             .add_source(config::Environment::with_prefix(ENV_PREFIX).separator("__"))
             .build();
@@ -78,19 +81,11 @@ impl EnvConf {
             }
         }
     }
+}
 
-    #[cfg(not(test))]
-    pub fn current() -> &'static Self {
-        &ENV_CONF
-    }
-
-    #[cfg(test)]
-    pub fn current() -> Self {
-        Self::derive()
-    }
-
-    #[allow(unused)] // RA bug
-    pub fn test_default() -> Self {
+#[cfg(test)]
+impl Default for EnvConf {
+    fn default() -> Self {
         Self {
             port: 0,
             dir: "".to_string(), // TODO
@@ -113,7 +108,7 @@ pub enum Env {
 }
 
 impl Env {
-    fn derive() -> Self {
+    pub fn derive() -> Self {
         // One variable to rule all
         let glob_env = std::env::var("SNK_ENV").unwrap_or_else(|_| "local".into());
 
@@ -122,16 +117,6 @@ impl Env {
             .unwrap_or(glob_env)
             .try_into()
             .expect("valid variable")
-    }
-
-    #[cfg(not(test))]
-    pub fn current() -> Self {
-        *ENV
-    }
-
-    #[cfg(test)]
-    pub fn current() -> Self {
-        Self::derive()
     }
 
     #[allow(unused)]
@@ -175,12 +160,12 @@ mod tests {
 
     #[test]
     fn default_current_env() {
-        assert!(Env::current().local());
+        assert!(Env::derive().local());
     }
 
     #[test]
     fn default_current_env_not() {
-        assert!(!Env::current().prod());
+        assert!(!Env::derive().prod());
     }
 
     #[test]
@@ -205,10 +190,10 @@ mod tests {
                 match &self.result {
                     #[allow(unused)]
                     Ok(expected) => {
-                        assert_eq!(&Env::current(), expected, "{:?}", self);
+                        assert_eq!(&Env::derive(), expected, "{:?}", self);
                     }
                     Err(()) => {
-                        let result = std::panic::catch_unwind(|| Env::current());
+                        let result = std::panic::catch_unwind(|| Env::derive());
                         assert!(result.is_err(), "{:?}", self);
                     }
                 }

@@ -6,16 +6,12 @@ mod serve_files;
 mod server;
 mod trace;
 
+use server::{Application, ServerOutput};
+
 #[tokio::main]
-async fn main() -> hyper::Result<()> {
-    let env = conf::Env::current();
-
-    let env_conf = conf::EnvConf::current();
-
-    let conf = conf::Conf {
-        env: env.clone(),
-        env_conf: env_conf.clone(),
-    };
+async fn main() -> ServerOutput {
+    let env = conf::Env::derive();
+    let env_conf = conf::EnvConf::derive(env);
 
     trace::TracingSubscriber::new()
         .pretty(env_conf.log.pretty)
@@ -24,7 +20,9 @@ async fn main() -> hyper::Result<()> {
     tracing::debug!("Env: {}", env);
     tracing::debug!("{:?}", env_conf);
 
-    let app = server::Application::build(&conf).await;
+    let conf = conf::Conf::new(env, env_conf);
+
+    let app = Application::build(conf).await;
 
     app.server().await
 }

@@ -3,15 +3,15 @@
 
 #![allow(unused)]
 
-use crate::conf;
+use crate::conf::Conf;
 use hyper::StatusCode;
 use std::sync::Arc;
 
-type ServerOutput = hyper::Result<()>;
+pub type ServerOutput = hyper::Result<()>;
 type Server = std::pin::Pin<Box<dyn std::future::Future<Output = ServerOutput> + Send>>;
 
 pub struct AppState {
-    conf: conf::Conf,
+    conf: Conf,
 }
 
 pub struct Application {
@@ -21,24 +21,20 @@ pub struct Application {
 }
 
 impl Application {
-    pub async fn build(conf: &conf::Conf) -> Self {
-        let address = format!("{}:{}", conf.env_conf.host, conf.env_conf.port);
+    pub async fn build(conf: Conf) -> Self {
+        let address = format!("{}:{}", conf.host, conf.port);
         tracing::debug!("Binding to {}", address);
         let listener = std::net::TcpListener::bind(&address).expect("vacant port");
-        let host = conf.env_conf.host.clone();
+        let host = conf.host.clone();
         let port = listener.local_addr().unwrap().port();
         let address = format!("{}:{}", host, port);
         tracing::info!("Serving on http://{}", address);
 
-        let app_state = Arc::new(AppState { conf: conf.clone() });
-
         return Self {
             server: Box::pin(
-                axum::Server::from_tcp(listener).unwrap().serve(
-                    routing::router(&conf)
-                        .with_state(app_state)
-                        .into_make_service(),
-                ),
+                axum::Server::from_tcp(listener)
+                    .unwrap()
+                    .serve(routing::router(conf).into_make_service()),
             ),
             port,
             host,
@@ -70,11 +66,13 @@ mod routing {
 
             use axum::{body::HttpBody, response::IntoResponse, Extension};
 
+            use crate::conf::Conf;
             use crate::serve_files::*;
 
             pub async fn fallback(
                 uri: axum::http::Uri,
                 Extension(cache): Extension<crate::serve_files::Cache>,
+                Extension(conf): Extension<Conf>,
             ) -> axum::response::Response {
                 let request_path = {
                     let request_path = uri.to_string();
@@ -82,8 +80,6 @@ mod routing {
                 };
 
                 use crate::conf;
-
-                let conf = conf::EnvConf::current();
 
                 if let Some(file) = cache.get_request_path(&request_path).await {
                     tracing::info!("cache hit for request path: {request_path:?}");
@@ -160,13 +156,16 @@ mod routing {
         }
     }
 
-    pub fn router(conf: &conf::Conf) -> Router<Arc<AppState>> {
+    pub fn router(conf: Conf) -> Router {
         let api_router = axum::Router::new().route("/health", get(routes::health));
 
         Router::new()
             .nest("/api", api_router)
             .fallback(routes::fallback::fallback)
-            .layer(AddExtensionLayer::new(crate::serve_files::Cache::default()))
+            .layer(AddExtensionLayer::new(crate::serve_files::Cache::new(
+                conf.request_path_lru_size,
+            )))
+            .layer(AddExtensionLayer::new(conf))
             .layer(crate::trace::request_trace_layer())
     }
 }
@@ -174,6 +173,7 @@ mod routing {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::conf;
 
     pub struct TestApp {
         pub port: u16,
@@ -184,11 +184,11 @@ mod tests {
 
     impl TestApp {
         async fn spawn() -> Self {
-            let env_conf = conf::EnvConf::test_default();
+            let env_conf = conf::EnvConf::default();
             let env = conf::Env::Local;
-            let conf = conf::Conf { env, env_conf };
+            let conf = conf::Conf::new(env, env_conf);
 
-            let app = Application::build(&conf).await;
+            let app = Application::build(conf).await;
             let port = app.port();
             let address = format!("http://{}:{}", app.host(), port);
             let app_handle = tokio::spawn(app.server());
