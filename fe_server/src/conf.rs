@@ -1,11 +1,14 @@
 // Configuration definitions, functions and tests
 //
+// TODO fix TestApp::spawn_app() requiring DIR env var
 
 use serde::Deserialize;
 use serde_aux::field_attributes::deserialize_number_from_string as de_num;
 
+// TODO do not initialize during tests
 lazy_static::lazy_static! {
-    static ref CURRENT_ENV: EnvConf = EnvConf::derive();
+    static ref ENV_CONF: EnvConf = EnvConf::derive();
+    static ref ENV: Env = Env::derive();
 }
 
 static ENV_PREFIX: &str = "FE_SRV";
@@ -77,7 +80,7 @@ impl EnvConf {
     }
 
     pub fn current() -> &'static Self {
-        &CURRENT_ENV
+        &ENV_CONF
     }
 
     #[allow(unused)] // RA bug
@@ -95,7 +98,7 @@ impl EnvConf {
 
 use derive_more::Display;
 
-#[derive(Debug, PartialEq, Display, Clone)]
+#[derive(Debug, PartialEq, Display, Clone, Copy)]
 pub enum Env {
     #[display(fmt = "local")]
     Local,
@@ -103,23 +106,33 @@ pub enum Env {
     Prod,
 }
 
-#[allow(unused)]
 impl Env {
-    pub fn current() -> Self {
+    fn derive() -> Self {
         // One variable to rule all
-        let hort_env = std::env::var("HORT_ENV").unwrap_or_else(|_| "local".into());
+        let glob_env = std::env::var("SNK_ENV").unwrap_or_else(|_| "local".into());
 
         // Or set a more specific per executable
         std::env::var(prefixed_env("ENV"))
-            .unwrap_or(hort_env)
+            .unwrap_or(glob_env)
             .try_into()
             .expect("valid variable")
     }
 
+    pub fn current() -> Self {
+        if cfg!(test) {
+            // tests may provide different configurations
+            Self::derive()
+        } else {
+            *ENV
+        }
+    }
+
+    #[allow(unused)]
     pub fn local(&self) -> bool {
         matches!(self, Self::Local)
     }
 
+    #[allow(unused)]
     pub fn prod(&self) -> bool {
         matches!(self, Self::Prod)
     }
@@ -167,7 +180,7 @@ mod tests {
     fn env() {
         #[derive(Debug)]
         struct Test<'a> {
-            hort_env: Option<&'a str>,
+            glob_env: Option<&'a str>,
             local_env: Option<&'a str>,
             result: Result<Env, ()>,
         }
@@ -176,7 +189,7 @@ mod tests {
             fn run(&self) {
                 let _lock = lock_test();
 
-                let _1 = self.hort_env.map(|env| set_env("HORT_ENV".into(), env));
+                let _1 = self.glob_env.map(|env| set_env("SNK_ENV".into(), env));
 
                 let _2 = self
                     .local_env
@@ -198,63 +211,63 @@ mod tests {
         // Successful cases
         {
             Test {
-                hort_env: Some(Env::Prod.as_ref()),
+                glob_env: Some(Env::Prod.as_ref()),
                 local_env: None,
                 result: Ok(Env::Prod),
             }
             .run();
 
             Test {
-                hort_env: Some(Env::Local.as_ref()),
+                glob_env: Some(Env::Local.as_ref()),
                 local_env: None,
                 result: Ok(Env::Local),
             }
             .run();
 
             Test {
-                hort_env: None,
+                glob_env: None,
                 local_env: None,
                 result: Ok(Env::Local),
             }
             .run();
 
             Test {
-                hort_env: None,
+                glob_env: None,
                 local_env: Some(Env::Local.as_ref()),
                 result: Ok(Env::Local),
             }
             .run();
 
             Test {
-                hort_env: None,
+                glob_env: None,
                 local_env: Some(Env::Prod.as_ref()),
                 result: Ok(Env::Prod),
             }
             .run();
 
             Test {
-                hort_env: Some(Env::Local.as_ref()),
+                glob_env: Some(Env::Local.as_ref()),
                 local_env: Some(Env::Local.as_ref()),
                 result: Ok(Env::Local),
             }
             .run();
 
             Test {
-                hort_env: Some(Env::Local.as_ref()),
+                glob_env: Some(Env::Local.as_ref()),
                 local_env: Some(Env::Prod.as_ref()),
                 result: Ok(Env::Prod),
             }
             .run();
 
             Test {
-                hort_env: Some(Env::Prod.as_ref()),
+                glob_env: Some(Env::Prod.as_ref()),
                 local_env: Some(Env::Local.as_ref()),
                 result: Ok(Env::Local),
             }
             .run();
 
             Test {
-                hort_env: Some(Env::Prod.as_ref()),
+                glob_env: Some(Env::Prod.as_ref()),
                 local_env: Some(Env::Prod.as_ref()),
                 result: Ok(Env::Prod),
             }
@@ -266,21 +279,21 @@ mod tests {
             let invalid_env_value = "";
 
             Test {
-                hort_env: Some(invalid_env_value),
+                glob_env: Some(invalid_env_value),
                 local_env: None,
                 result: Err(()),
             }
             .run();
 
             Test {
-                hort_env: Some(invalid_env_value),
+                glob_env: Some(invalid_env_value),
                 local_env: None,
                 result: Err(()),
             }
             .run();
 
             Test {
-                hort_env: Some(invalid_env_value),
+                glob_env: Some(invalid_env_value),
                 local_env: Some(invalid_env_value),
                 result: Err(()),
             }
