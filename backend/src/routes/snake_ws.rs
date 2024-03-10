@@ -1,5 +1,5 @@
-use crate::routes::imports::*;
 use crate::server::UserConnectInfo;
+use crate::{conf::Conf, routes::imports::*};
 use axum::extract::{
     connect_info::ConnectInfo,
     ws::{Message, WebSocket, WebSocketUpgrade},
@@ -31,6 +31,7 @@ pub async fn ws(
     headers: hyper::HeaderMap,
     Extension(lobbies): Extension<Lobbies>,
     Extension(uns): Extension<PlayerUserNames>,
+    Extension(conf): Extension<Conf>,
 ) -> Response {
     let ws = match maybe_ws {
         Ok(ws) => ws,
@@ -42,7 +43,7 @@ pub async fn ws(
     };
 
     let sock_addr = con_info.socket_addr(&headers);
-    if Env::current().local() {
+    if conf.env.local() {
         tracing::info!("Client connected to Snake Ws: {:?}", sock_addr);
     } else {
         tracing::info!("Client connected to Snake Ws");
@@ -52,17 +53,23 @@ pub async fn ws(
     // expected to be unique across current state
     let con = sock_addr.port();
 
-    ws.on_upgrade(move |socket| handle_socket(socket, con, lobbies, uns))
+    ws.on_upgrade(move |socket| handle_socket(socket, con, lobbies, uns, conf))
 }
 
 type ClientMsg = WsMsg<interfacing::snake::WsClientMsg>;
 type ServerMsg = WsMsg<interfacing::snake::WsServerMsg>;
 
-async fn handle_socket(socket: WebSocket, con: Con, lobbies: Lobbies, uns: PlayerUserNames) {
+async fn handle_socket(
+    socket: WebSocket,
+    con: Con,
+    lobbies: Lobbies,
+    uns: PlayerUserNames,
+    conf: Conf,
+) {
     let con_state = {
         let mut con_state = ConState::default();
 
-        con_state.un = if AUTO_GEN_USER_NAME && Env::current().local() {
+        con_state.un = if AUTO_GEN_USER_NAME && conf.env.local() {
             let un = format!("Player {con}");
             // do not handle possible collision, since it's debug only feature
             uns.try_insert(un.clone(), con).await.unwrap();
@@ -84,6 +91,7 @@ async fn handle_socket(socket: WebSocket, con: Con, lobbies: Lobbies, uns: Playe
         lobbies.clone(),
         con.clone(),
         uns.clone(),
+        conf,
     ));
     let wh = tokio::spawn(write(sender, server_msg_receiver));
 
@@ -109,6 +117,7 @@ async fn read(
     lobbies: Lobbies,
     con: Con,
     uns: PlayerUserNames,
+    conf: Conf,
 ) {
     loop {
         match receiver.next().await {
@@ -122,6 +131,7 @@ async fn read(
                         lobbies.clone(),
                         con.clone(),
                         uns.clone(),
+                        conf.clone(),
                     ));
                 }
                 Err(_) => {
@@ -150,6 +160,7 @@ async fn handle_received_message(
     lobbies: Lobbies,
     con: Con,
     uns: PlayerUserNames,
+    conf: Conf,
 ) {
     use interfacing::snake::{PinnedMessage, WsClientMsg::*, WsServerMsg};
 
@@ -293,7 +304,7 @@ async fn handle_received_message(
             CreateLobby(_) | JoinLobby(_) | UserName | LobbyList | SetUserName(_) | VoteStart(_)
             | LeaveLobby,
         ) => {
-            if Env::current().prod() {
+            if conf.env.prod() {
                 tracing::info!("ack expected")
             } else {
                 unreachable!("ack expected")

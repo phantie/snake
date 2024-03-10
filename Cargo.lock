@@ -171,7 +171,6 @@ dependencies = [
  "futures-util",
  "hyper",
  "interfacing",
- "lazy_static",
  "once_cell",
  "rand",
  "reqwest",

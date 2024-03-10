@@ -7,7 +7,7 @@ use crate::conf;
 use hyper::StatusCode;
 use std::sync::Arc;
 
-type ServerOutput = hyper::Result<()>;
+pub type ServerOutput = hyper::Result<()>;
 type Server = std::pin::Pin<Box<dyn std::future::Future<Output = ServerOutput> + Send>>;
 
 pub struct Application {
@@ -17,18 +17,18 @@ pub struct Application {
 }
 
 impl Application {
-    pub async fn build(conf: &conf::Conf) -> Self {
-        let address = format!("{}:{}", conf.env_conf.host, conf.env_conf.port);
+    pub async fn build(conf: conf::Conf) -> Self {
+        let address = format!("{}:{}", conf.host, conf.port);
         tracing::debug!("Binding to {}", address);
         let listener = std::net::TcpListener::bind(&address).expect("vacant port");
-        let host = conf.env_conf.host.clone();
+        let host = conf.host.clone();
         let port = listener.local_addr().unwrap().port();
         let address = format!("{}:{}", host, port);
         tracing::info!("Serving on http://{}", address);
 
         return Self {
             server: Box::pin(axum::Server::from_tcp(listener).unwrap().serve(
-                routing::router(&conf).into_make_service_with_connect_info::<UserConnectInfo>(),
+                routing::router(conf).into_make_service_with_connect_info::<UserConnectInfo>(),
             )),
             port,
             host,
@@ -68,7 +68,7 @@ mod routing {
         LatencyUnit, ServiceBuilderExt,
     };
 
-    pub fn router(_conf: &crate::conf::Conf) -> Router {
+    pub fn router(conf: crate::conf::Conf) -> Router {
         use crate::routes::*;
         use static_routes::{Get, Post};
 
@@ -82,6 +82,7 @@ mod routing {
         Router::new()
             .nest("/api", api_router)
             .layer(CompressionLayer::new())
+            .layer(AddExtensionLayer::new(conf))
             .layer(AddExtensionLayer::new(
                 crate::mp::lobby::lobbies::Lobbies::default(),
             ))
@@ -176,9 +177,9 @@ mod tests {
         async fn spawn() -> Self {
             let env_conf = conf::EnvConf::test_default();
             let env = conf::Env::Local;
-            let conf = conf::Conf { env, env_conf };
+            let conf = conf::Conf::new(env, env_conf);
 
-            let app = Application::build(&conf).await;
+            let app = Application::build(conf).await;
             let port = app.port();
             let address = format!("http://{}:{}", app.host(), port);
             let app_handle = tokio::spawn(app.server());
