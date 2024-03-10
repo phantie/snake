@@ -31,4 +31,5 @@ Position as json is {"x":x,"y":y} taking 11 + 2 * (1 to 5 (1 for possible minus 
 ### Room for improvement
 - State reconciliation using partial update, instead of pushing full state to client on server update. Goal: smaller payloads.
 - Compress messages, for example, leaving field names out of payloads. Goal: smaller payloads.
+- Push updates only for possibly visible to client objects. Goal: smaller payloads.
 - Root frontend component refactoring. Goal: reduce technical debt.
