@@ -109,7 +109,8 @@ impl RunningLobbyState {
         //
         // TODO figure can still spawn on boundaries, seems like by one problem
         fn refill_foods(foods: &mut domain::Foods, boundaries: &domain::Boundaries) {
-            if foods.count() < 30 {
+            // TODO use config value after Env::current() is optimized
+            if foods.count() < 10 {
                 use strum::IntoEnumIterator;
                 let figures = domain::figures::Figures::iter();
 

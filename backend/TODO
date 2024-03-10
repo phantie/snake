@@ -1,5 +1,5 @@
 PRIORITY:
-- reduce simulatenous spawned food
+- optimize Env::current() call by calculating config only once
 
 EXTRA:
 - stop running advance() when every snake dies
