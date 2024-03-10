@@ -5,7 +5,7 @@
 use serde::Deserialize;
 use serde_aux::field_attributes::deserialize_number_from_string as de_num;
 
-// TODO do not initialize during tests
+#[cfg(not(test))]
 lazy_static::lazy_static! {
     static ref ENV_CONF: EnvConf = EnvConf::derive();
     static ref ENV: Env = Env::derive();
@@ -79,8 +79,14 @@ impl EnvConf {
         }
     }
 
+    #[cfg(not(test))]
     pub fn current() -> &'static Self {
         &ENV_CONF
+    }
+
+    #[cfg(test)]
+    pub fn current() -> Self {
+        Self::derive()
     }
 
     #[allow(unused)] // RA bug
@@ -118,13 +124,14 @@ impl Env {
             .expect("valid variable")
     }
 
+    #[cfg(not(test))]
     pub fn current() -> Self {
-        if cfg!(test) {
-            // tests may provide different configurations
-            Self::derive()
-        } else {
-            *ENV
-        }
+        *ENV
+    }
+
+    #[cfg(test)]
+    pub fn current() -> Self {
+        Self::derive()
     }
 
     #[allow(unused)]
