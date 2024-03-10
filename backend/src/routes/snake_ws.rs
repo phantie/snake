@@ -22,8 +22,8 @@ use crate::mp::{
     Con,
 };
 
-// for debugging
-const AUTO_GEN_USER_NAME: bool = false;
+// for debugging, to skip name entering everytime
+const AUTO_GEN_USER_NAME: bool = true;
 
 pub async fn ws(
     maybe_ws: Result<WebSocketUpgrade, axum::extract::ws::rejection::WebSocketUpgradeRejection>,

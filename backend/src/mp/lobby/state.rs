@@ -57,8 +57,14 @@ impl From<&PrepLobbyState> for RunningLobbyState {
             let mut snakes = vec![];
 
             for (i, con) in cons.iter().cloned().enumerate() {
+                let i = i as i32;
+                // generate symmetrical placement over Y axis
+                // leave one empty cell between snakes: | | | |
+                let x_offset = if i % 2 == 0 { 0 - i } else { 0 + i + 1 };
+                let y_offset = 3;
+
                 let sections = Sections::from_directions(
-                    Pos::new(i as _, 0),
+                    Pos::new(x_offset, y_offset),
                     (0..3).into_iter().map(|_| Direction::Up),
                 );
 
@@ -75,7 +81,17 @@ impl From<&PrepLobbyState> for RunningLobbyState {
 
         let foods = Foods::default();
 
-        let boundaries = domain::Pos::new(0, 0).boundaries_in_radius(10, 10);
+        /* ensure enough space for placements */
+        // 1 => 2
+        // 2 => 4
+        // 3 => 4
+        // 4 => 6
+        // 5 => 6
+        // ...
+        let min_x_space_radius = cons.len() + 2 - (cons.len() % 2);
+
+        let boundaries =
+            domain::Pos::new(0, 0).boundaries_in_radius(6.max(min_x_space_radius as _), 6);
 
         Self {
             snakes,
