@@ -23,7 +23,7 @@ use crate::mp::{
 };
 
 // for debugging
-const AUTO_GEN_USER_NAME: bool = true;
+const AUTO_GEN_USER_NAME: bool = false;
 
 pub async fn ws(
     maybe_ws: Result<WebSocketUpgrade, axum::extract::ws::rejection::WebSocketUpgradeRejection>,
@@ -62,7 +62,7 @@ async fn handle_socket(socket: WebSocket, con: Con, lobbies: Lobbies, uns: Playe
     let con_state = {
         let mut con_state = ConState::default();
 
-        con_state.un = if AUTO_GEN_USER_NAME {
+        con_state.un = if AUTO_GEN_USER_NAME && Env::current().local() {
             let un = format!("Player {con}");
             // do not handle possible collision, since it's debug only feature
             uns.try_insert(un.clone(), con).await.unwrap();

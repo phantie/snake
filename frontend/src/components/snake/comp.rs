@@ -190,7 +190,6 @@ impl Component for Snake {
         let contrast_bg_color = &theme.contrast_bg_color;
         let text_color = &theme.text_color;
 
-        // HERE
         let btn_style = css! {"
             border: 2px solid ${box_border_color};
             width: 80px; height: 20px;
@@ -428,13 +427,41 @@ impl Component for Snake {
                                     })
                                 };
 
+                                let style =
+                                    vec![css! {"height:100vh;"}, styles::centered_column_items()];
+
+                                let btn_style = classes![
+                                    css! {
+                                        "border-color: ${box_border_color};
+                            margin-top: 30px;
+                            ",
+                                        box_border_color = box_border_color
+                                    },
+                                    styles::average_btn_style(),
+                                ];
+
+                                let form_ref = NodeRef::default();
+
+                                let onclick = {
+                                    let form_ref = form_ref.clone();
+                                    ctx.link().callback(move |event: web_sys::MouseEvent| {
+                                        event.prevent_default();
+                                        let form =
+                                            form_ref.cast::<web_sys::HtmlFormElement>().unwrap();
+                                        submit_form(&form);
+                                        Self::Message::Nothing
+                                    })
+                                };
+
+                                // HERE
                                 html! {
-                                    <>
-                                    {"Join as..."}
-                                    <form {onsubmit} method="post">
-                                        <input type="text" ref={user_name_ref}/>
+                                    <div class={style}>
+                                    <h1>{ "Join as..." }</h1>
+                                    <form {onsubmit} method="post" ref={form_ref}>
+                                        <input class={styles::input_style()} type="text" ref={user_name_ref}/>
+                                        <div {onclick} class={btn_style}>{ "Enter" }</div>
                                     </form>
-                                    </>
+                                    </div>
                                 }
                             }
                             Some(user_name) => {
@@ -623,13 +650,55 @@ impl Component for Snake {
                         })
                     };
 
+                    let form_ref = NodeRef::default();
+
                     let style = vec![css! {"height:100vh;"}, styles::centered_column_items()];
 
+                    let btn_style = classes![
+                        css! {
+                            "border-color: ${box_border_color};
+                            margin-top: 30px;
+                            ",
+                            box_border_color = box_border_color
+                        },
+                        styles::average_btn_style(),
+                    ];
+
+                    let onclick = {
+                        let form_ref = form_ref.clone();
+                        ctx.link().callback(move |event: web_sys::MouseEvent| {
+                            event.prevent_default();
+                            let form = form_ref.clone().cast::<web_sys::HtmlFormElement>().unwrap();
+                            form.dispatch_event(
+                                &web_sys::Event::new_with_event_init_dict("submit", &{
+                                    let mut e = web_sys::EventInit::new();
+                                    e.cancelable(true);
+                                    e.bubbles(true);
+                                    e
+                                })
+                                .unwrap(),
+                            );
+                            Self::Message::Nothing
+                        })
+                    };
+
+                    let onclick = {
+                        let form_ref = form_ref.clone();
+                        ctx.link().callback(move |event: web_sys::MouseEvent| {
+                            event.prevent_default();
+                            let form = form_ref.cast::<web_sys::HtmlFormElement>().unwrap();
+                            submit_form(&form);
+                            Self::Message::Nothing
+                        })
+                    };
+
+                    // HERE
                     html! {
                         <div class={style}>
                         <h1>{ "Enter new lobby name:" }</h1>
-                        <form {onsubmit} method="post">
+                        <form {onsubmit} method="post" ref={form_ref}>
                             <input class={styles::input_style()} type="text" ref={name_ref}/>
+                            <div {onclick} class={btn_style}>{ "Create" }</div>
                         </form>
                         </div>
                     }
@@ -2305,4 +2374,34 @@ impl Snake {
 
         !UPDATE
     }
+}
+
+// // trigger customly defined submit function on form
+// fn submit_form(form_ref: NodeRef) -> impl Fn(MouseEvent) {
+//     move |event: web_sys::MouseEvent| {
+//         event.prevent_default();
+//         let form = form_ref.cast::<web_sys::HtmlFormElement>().unwrap();
+//         form.dispatch_event(
+//             &web_sys::Event::new_with_event_init_dict("submit", &{
+//                 let mut e = web_sys::EventInit::new();
+//                 e.cancelable(true);
+//                 e.bubbles(true);
+//                 e
+//             })
+//             .unwrap(),
+//         );
+//     }
+// }
+
+// trigger customly defined submit function on form
+fn submit_form(form: &web_sys::HtmlFormElement) {
+    form.dispatch_event(
+        &web_sys::Event::new_with_event_init_dict("submit", &{
+            let mut e = web_sys::EventInit::new();
+            e.cancelable(true);
+            e.bubbles(true);
+            e
+        })
+        .unwrap(),
+    );
 }
