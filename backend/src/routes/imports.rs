@@ -13,4 +13,3 @@ pub use axum::{
     response::{IntoResponse, Response},
 };
 pub use interfacing;
-pub use static_routes::*;

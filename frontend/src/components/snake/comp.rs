@@ -190,7 +190,6 @@ impl Component for Snake {
         let contrast_bg_color = &theme.contrast_bg_color;
         let text_color = &theme.text_color;
 
-        // HERE
         let btn_style = css! {"
             border: 2px solid ${box_border_color};
             width: 80px; height: 20px;
@@ -428,13 +427,41 @@ impl Component for Snake {
                                     })
                                 };
 
+                                let style =
+                                    vec![css! {"height:100vh;"}, styles::centered_column_items()];
+
+                                let btn_style = classes![
+                                    css! {
+                                        "border-color: ${box_border_color};
+                            margin-top: 30px;
+                            ",
+                                        box_border_color = box_border_color
+                                    },
+                                    styles::average_btn_style(),
+                                ];
+
+                                let form_ref = NodeRef::default();
+
+                                let onclick = {
+                                    let form_ref = form_ref.clone();
+                                    ctx.link().callback(move |event: web_sys::MouseEvent| {
+                                        event.prevent_default();
+                                        let form =
+                                            form_ref.cast::<web_sys::HtmlFormElement>().unwrap();
+                                        submit_form(&form);
+                                        Self::Message::Nothing
+                                    })
+                                };
+
+                                // HERE
                                 html! {
-                                    <>
-                                    {"Join as..."}
-                                    <form {onsubmit} method="post">
-                                        <input type="text" ref={user_name_ref}/>
+                                    <div class={style}>
+                                    <h1>{ "Join as..." }</h1>
+                                    <form {onsubmit} method="post" ref={form_ref}>
+                                        <input class={styles::input_style()} type="text" ref={user_name_ref}/>
+                                        <div {onclick} class={btn_style}>{ "Enter" }</div>
                                     </form>
-                                    </>
+                                    </div>
                                 }
                             }
                             Some(user_name) => {
@@ -495,35 +522,6 @@ impl Component for Snake {
                             let ls = self.ws_state.joined_lobby_state.as_ref().expect("to exist");
                             let lobby_name =
                                 self.ws_state.joined_lobby_name.as_ref().expect("to exist");
-
-                            // TODO make request to server
-                            pub async fn get_lobby(
-                                name: String,
-                            ) -> Result<interfacing::snake::GetLobby, ()>
-                            {
-                                let response = Request::get(&format!("/api/snake/lobby/{}", name))
-                                    .send()
-                                    .await
-                                    .unwrap(); // TODO handle
-
-                                match response.status() {
-                                    200 => Ok(response
-                                        .json::<interfacing::snake::GetLobby>()
-                                        .await
-                                        .unwrap()), // TODO handle
-                                    _ => unimplemented!(), // TODO handle
-                                }
-                            }
-
-                            // {
-                            //     let name = name.clone();
-                            //     ctx.link().send_future(async move {
-                            //         match get_lobby(name.clone()).await {
-                            //             Ok(lobby) => unimplemented!(),
-                            //             Err(_e) => Self::Message::Nothing,
-                            //         }
-                            //     });
-                            // }
 
                             let block = match ls {
                                 LobbyState::Prep(LobbyPrep { participants }) => {
@@ -638,62 +636,69 @@ impl Component for Snake {
                 } => {
                     let name_ref = NodeRef::default();
 
-                    async fn post_lobby(
-                        form: &interfacing::snake::CreateLobby,
-                    ) -> request::SendResult {
-                        Request::post("/api/snake/lobby")
-                            .json(&form)
-                            .unwrap()
-                            .send()
-                            .await
-                    }
-
                     let onsubmit = {
                         let name_ref = name_ref.clone();
 
-                        ctx.link().callback_future(move |event: SubmitEvent| {
+                        ctx.link().callback(move |event: SubmitEvent| {
                             event.prevent_default();
 
                             let name = name_ref.cast::<HtmlInputElement>().unwrap().value();
 
-                            let form = interfacing::snake::CreateLobby { name: name.clone() };
-
-                            async move {
-                                console::log!(format!("submitting: {:?}", form));
-                                let r = post_lobby(&form).await.unwrap();
-                                r.log_status();
-
-                                match r.status() {
-                                    200 => {
-                                        console::log!("lobby created");
-
-                                        Self::Message::RedirectToLobby { lobby_name: name }
-                                        // Self::Message::StateChange(State::NotBegun {
-                                        //     inner: NotBegunState::MPPrejoinLobby {
-                                        //         lobby_name: form.name,
-                                        //     },
-                                        // })
-                                    }
-                                    // TODO handle errors for validation
-                                    409 => {
-                                        web_sys::window().unwrap().alert_with_message(
-                                            "Lobby with this name already exists",
-                                        );
-                                        Self::Message::Nothing
-                                    }
-                                    _ => unimplemented!(),
-                                }
-                            }
+                            Self::Message::WsSend("create-lobby".pinned_msg(
+                                interfacing::snake::WsClientMsg::CreateLobby(name.clone()),
+                            ))
                         })
                     };
 
+                    let form_ref = NodeRef::default();
+
                     let style = vec![css! {"height:100vh;"}, styles::centered_column_items()];
 
+                    let btn_style = classes![
+                        css! {
+                            "border-color: ${box_border_color};
+                            margin-top: 30px;
+                            ",
+                            box_border_color = box_border_color
+                        },
+                        styles::average_btn_style(),
+                    ];
+
+                    let onclick = {
+                        let form_ref = form_ref.clone();
+                        ctx.link().callback(move |event: web_sys::MouseEvent| {
+                            event.prevent_default();
+                            let form = form_ref.clone().cast::<web_sys::HtmlFormElement>().unwrap();
+                            form.dispatch_event(
+                                &web_sys::Event::new_with_event_init_dict("submit", &{
+                                    let mut e = web_sys::EventInit::new();
+                                    e.cancelable(true);
+                                    e.bubbles(true);
+                                    e
+                                })
+                                .unwrap(),
+                            );
+                            Self::Message::Nothing
+                        })
+                    };
+
+                    let onclick = {
+                        let form_ref = form_ref.clone();
+                        ctx.link().callback(move |event: web_sys::MouseEvent| {
+                            event.prevent_default();
+                            let form = form_ref.cast::<web_sys::HtmlFormElement>().unwrap();
+                            submit_form(&form);
+                            Self::Message::Nothing
+                        })
+                    };
+
+                    // HERE
                     html! {
                         <div class={style}>
                         <h1>{ "Enter new lobby name:" }</h1>
-                        <form {onsubmit} method="post">
+                        <form {onsubmit} method="post" ref={form_ref}>
                             <input class={styles::input_style()} type="text" ref={name_ref}/>
+                            <div {onclick} class={btn_style}>{ "Create" }</div>
                         </form>
                         </div>
                     }
@@ -2257,6 +2262,18 @@ impl Snake {
                 // TODO decouple action to take somehow
                 //
                 match (ack_msg, msg) {
+                    (WsClientMsg::CreateLobby(value), WsServerMsg::Ack) => {
+                        ctx.link().send_message(SnakeMsg::RedirectToLobby {
+                            lobby_name: value.clone(),
+                        });
+                    }
+
+                    (WsClientMsg::CreateLobby(value), WsServerMsg::Err(msg)) => {
+                        web_sys::window()
+                            .unwrap()
+                            .alert_with_message("Lobby with this name already exists");
+                    }
+
                     (WsClientMsg::LobbyList, WsServerMsg::LobbyList(lobby_list)) => {
                         if let State::NotBegun {
                             inner: NotBegunState::MPLobbyList { lobbies },
@@ -2357,4 +2374,34 @@ impl Snake {
 
         !UPDATE
     }
+}
+
+// // trigger customly defined submit function on form
+// fn submit_form(form_ref: NodeRef) -> impl Fn(MouseEvent) {
+//     move |event: web_sys::MouseEvent| {
+//         event.prevent_default();
+//         let form = form_ref.cast::<web_sys::HtmlFormElement>().unwrap();
+//         form.dispatch_event(
+//             &web_sys::Event::new_with_event_init_dict("submit", &{
+//                 let mut e = web_sys::EventInit::new();
+//                 e.cancelable(true);
+//                 e.bubbles(true);
+//                 e
+//             })
+//             .unwrap(),
+//         );
+//     }
+// }
+
+// trigger customly defined submit function on form
+fn submit_form(form: &web_sys::HtmlFormElement) {
+    form.dispatch_event(
+        &web_sys::Event::new_with_event_init_dict("submit", &{
+            let mut e = web_sys::EventInit::new();
+            e.cancelable(true);
+            e.bubbles(true);
+            e
+        })
+        .unwrap(),
+    );
 }

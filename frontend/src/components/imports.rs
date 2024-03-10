@@ -46,47 +46,6 @@ pub mod request {
     pub type SendResult = std::result::Result<gloo_net::http::Response, gloo_net::Error>;
 }
 
-#[derive(thiserror::Error, Debug)]
-pub enum SessionError {
-    #[error("Authentication failed")]
-    AuthError,
-
-    #[error("Request error")]
-    RequestError(#[source] gloo_net::Error),
-
-    #[error("Bad status")]
-    BadStatus(u16),
-
-    #[error("Parsing error")]
-    ParsingError(#[source] gloo_net::Error),
-}
-
-impl SessionError {
-    #[allow(dead_code)]
-    pub fn is_unexpected(&self) -> bool {
-        match self {
-            Self::AuthError => false,
-            _ => true,
-        }
-    }
-}
-
-pub async fn fetch_admin_session() -> Result<interfacing::AdminSession, SessionError> {
-    let response: Response = Request::static_get(routes().api.admin.session)
-        .send()
-        .await
-        .map_err(SessionError::RequestError)?;
-
-    match response.status() {
-        200 => Ok(response
-            .json::<interfacing::AdminSession>()
-            .await
-            .map_err(SessionError::ParsingError)?),
-        401 => Err(SessionError::AuthError),
-        status => Err(SessionError::BadStatus(status)),
-    }
-}
-
 pub fn internal_problems() -> Html {
     html! {
         <DefaultStyling>

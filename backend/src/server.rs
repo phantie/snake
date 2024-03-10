@@ -77,16 +77,16 @@ mod routing {
         let api_router = Router::new()
             .route(routes.health_check.get().postfix(), get(health_check))
             // TODO investigate why POST on /lobby gives 200
-            .route("/snake/lobby", post(snake::create_lobby))
-            .route("/snake/lobby/:name", get(snake::get_lobby))
-            .route("/snake/ws", get(snake::ws::ws));
+            .route("/snake/ws", get(snake_ws::ws));
 
         Router::new()
             .nest("/api", api_router)
             .layer(CompressionLayer::new())
-            .layer(AddExtensionLayer::new(crate::mp_snake::Lobbies::default()))
             .layer(AddExtensionLayer::new(
-                crate::mp_snake::PlayerUserNames::default(),
+                crate::mp::lobby::lobbies::Lobbies::default(),
+            ))
+            .layer(AddExtensionLayer::new(
+                crate::mp::lobby::usernames::PlayerUserNames::default(),
             ))
             .layer(crate::trace::request_trace_layer())
     }
