@@ -2,6 +2,13 @@ use crate::mp::{domain, Con};
 use rand::{seq::IteratorRandom, Rng};
 use std::collections::{HashMap, HashSet};
 
+pub enum LobbyState {
+    Prep(PrepLobbyState),
+    Running(RunningLobbyState),
+    // terminated is scheduled for clean up
+    Terminated,
+}
+
 // lobby parameters
 #[derive(Default)]
 pub struct PrepLobbyState {
@@ -103,6 +110,10 @@ impl From<&PrepLobbyState> for RunningLobbyState {
     }
 }
 
+pub fn leave_food_trace(snake: &domain::Snake, foods: &mut domain::Foods) {
+    foods.extend(snake.iter_vertices().map(domain::Food::from));
+}
+
 impl RunningLobbyState {
     pub fn advance(&mut self) {
         // TODO do not spawn on current snake positions,
@@ -151,17 +162,13 @@ impl RunningLobbyState {
                 .map(|(_, snake)| snake.clone())
                 .collect::<Vec<_>>();
 
-            fn snake_to_food_trace(foods: &mut domain::Foods, snake: &mut domain::Snake) {
-                foods.extend(snake.iter_vertices().map(domain::Food::from));
-            }
-
             match snake.advance(&mut self.foods, other_snakes.as_slice(), &self.boundaries) {
                 AdvanceResult::Success => {}
                 AdvanceResult::BitYaSelf
                 | AdvanceResult::BitSomeone
                 | AdvanceResult::OutOfBounds => {
                     rm.push(i);
-                    snake_to_food_trace(&mut self.foods, snake);
+                    leave_food_trace(snake, &mut self.foods);
                 }
             }
         }
@@ -190,14 +197,10 @@ impl RunningLobbyState {
     // no join_con because joining midgame is forbidden
 
     pub fn remove_con(&mut self, con: &Con) {
+        if let Some(snake) = self.snakes.get(con) {
+            leave_food_trace(snake, &mut self.foods);
+        }
         self.cons.remove(con);
         self.snakes.remove(con);
     }
-}
-
-pub enum LobbyState {
-    Prep(PrepLobbyState),
-    Running(RunningLobbyState),
-    // terminated is scheduled for clean up
-    Terminated,
 }

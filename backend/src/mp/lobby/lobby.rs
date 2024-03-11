@@ -30,29 +30,35 @@ impl Lobby {
         match &mut self.state {
             LobbyState::Prep(s) => {
                 self.state = LobbyState::Running(s.to_running());
-
-                let ch = self.ch.clone().expect("set up channel");
-                self._loop_handle.replace(
-                    tokio::spawn(async move {
-                        // TODO should be swaped, or added larger pause before loop
-                        loop {
-                            ch.send(LobbyCtrlMsg::LobbyMsg(LobbyMsg::Advance)).unwrap();
-                            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-                        }
-                    })
-                    .abort_handle(),
-                );
-
+                self.start_loop();
                 Ok(())
             }
             _ => Err("Illegal state".into()),
         }
     }
 
+    fn start_loop(&mut self) {
+        let ch = self.ch.clone().expect("set up channel");
+        self._loop_handle.replace(
+            tokio::spawn(async move {
+                // TODO should be swaped, or added larger pause before loop
+                loop {
+                    ch.send(LobbyCtrlMsg::LobbyMsg(LobbyMsg::Advance)).unwrap();
+                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                }
+            })
+            .abort_handle(),
+        );
+    }
+
+    fn stop_loop(&mut self) {
+        self._loop_handle.take().map(|h| h.abort());
+    }
+
     pub fn stop(&mut self) {
         match &self.state {
             LobbyState::Running { .. } => {
-                self._loop_handle.take().expect("set up channel").abort();
+                self.stop_loop();
                 self.ch.take();
 
                 self.state = LobbyState::Terminated;
