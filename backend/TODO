@@ -1,0 +1,6 @@
+PRIORITY:
+
+EXTRA:
+- stop running advance() when every snake dies
+- show win screen and stop game if game started with 2 or more players,
+  when 1 player remaining with living snake

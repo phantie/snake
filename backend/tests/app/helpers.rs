@@ -1,24 +1,13 @@
-use backend::{conf, server::Application, trace};
+use backend::{conf, server::Application};
 use hyper::StatusCode;
-use once_cell::sync::Lazy;
 use static_routes::*;
 
-static TRACING: Lazy<()> = Lazy::new(|| {
-    let env_conf = conf::EnvConf::current();
-
-    trace::TracingSubscriber::new()
-        .pretty(env_conf.log.pretty)
-        .set_global_default();
-});
-
 pub async fn spawn_app() -> TestApp {
-    Lazy::force(&TRACING);
-
     let env_conf = conf::EnvConf::test_default();
     let env = conf::Env::Local;
-    let conf = conf::Conf { env, env_conf };
+    let conf = conf::Conf::new(env, env_conf);
 
-    let application = Application::build(&conf).await;
+    let application = Application::build(conf).await;
 
     let host = application.host();
     let port = application.port();

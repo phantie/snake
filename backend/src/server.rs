@@ -1,34 +1,30 @@
 // Server and router definition and tests
 //
 
-#![allow(unused)]
-
 use crate::conf;
-use hyper::StatusCode;
-use std::sync::Arc;
 
-type ServerOutput = hyper::Result<()>;
+pub type ServerOutput = hyper::Result<()>;
 type Server = std::pin::Pin<Box<dyn std::future::Future<Output = ServerOutput> + Send>>;
 
 pub struct Application {
+    server: Server,
     host: String,
     port: u16,
-    server: Server,
 }
 
 impl Application {
-    pub async fn build(conf: &conf::Conf) -> Self {
-        let address = format!("{}:{}", conf.env_conf.host, conf.env_conf.port);
+    pub async fn build(conf: conf::Conf) -> Self {
+        let address = format!("{}:{}", conf.host, conf.port);
         tracing::debug!("Binding to {}", address);
         let listener = std::net::TcpListener::bind(&address).expect("vacant port");
-        let host = conf.env_conf.host.clone();
+        let host = conf.host.clone();
         let port = listener.local_addr().unwrap().port();
         let address = format!("{}:{}", host, port);
         tracing::info!("Serving on http://{}", address);
 
         return Self {
             server: Box::pin(axum::Server::from_tcp(listener).unwrap().serve(
-                routing::router(&conf).into_make_service_with_connect_info::<UserConnectInfo>(),
+                routing::router(conf).into_make_service_with_connect_info::<UserConnectInfo>(),
             )),
             port,
             host,
@@ -49,39 +45,34 @@ impl Application {
 }
 
 mod routing {
-    use super::*;
+    use crate::routes::*;
     use axum::routing::Router;
+    #[allow(unused_imports)]
     use axum::routing::{get, post};
+    #[allow(unused_imports)]
+    use static_routes::{Get, Post};
+    use tower_http::{add_extension::AddExtensionLayer, compression::CompressionLayer};
 
     mod routes {
-        use super::*;
+        use hyper::StatusCode;
+
         pub async fn health() -> StatusCode {
             StatusCode::OK
         }
     }
 
-    use std::sync::Arc;
-    use tower_http::{
-        add_extension::AddExtensionLayer,
-        compression::CompressionLayer,
-        trace::{DefaultMakeSpan, DefaultOnRequest, DefaultOnResponse, TraceLayer},
-        LatencyUnit, ServiceBuilderExt,
-    };
-
-    pub fn router(_conf: &crate::conf::Conf) -> Router {
-        use crate::routes::*;
-        use static_routes::{Get, Post};
-
+    pub fn router(conf: crate::conf::Conf) -> Router {
         let routes = static_routes::routes().api;
 
         let api_router = Router::new()
-            .route(routes.health_check.get().postfix(), get(health_check))
+            .route(routes.health_check.get().postfix(), get(routes::health))
             // TODO investigate why POST on /lobby gives 200
             .route("/snake/ws", get(snake_ws::ws));
 
         Router::new()
             .nest("/api", api_router)
             .layer(CompressionLayer::new())
+            .layer(AddExtensionLayer::new(conf))
             .layer(AddExtensionLayer::new(
                 crate::mp::lobby::lobbies::Lobbies::default(),
             ))
@@ -164,6 +155,7 @@ pub fn ip_address(h: &hyper::HeaderMap) -> std::net::IpAddr {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use hyper::StatusCode;
 
     pub struct TestApp {
         pub port: u16,
@@ -176,9 +168,9 @@ mod tests {
         async fn spawn() -> Self {
             let env_conf = conf::EnvConf::test_default();
             let env = conf::Env::Local;
-            let conf = conf::Conf { env, env_conf };
+            let conf = conf::Conf::new(env, env_conf);
 
-            let app = Application::build(&conf).await;
+            let app = Application::build(conf).await;
             let port = app.port();
             let address = format!("http://{}:{}", app.host(), port);
             let app_handle = tokio::spawn(app.server());
@@ -199,7 +191,7 @@ mod tests {
 
     #[tokio::test]
     async fn spawn_app() {
-        let app = TestApp::spawn().await;
+        let _app = TestApp::spawn().await;
     }
 
     #[tokio::test]

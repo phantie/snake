@@ -2,6 +2,13 @@ use crate::mp::{domain, Con};
 use rand::{seq::IteratorRandom, Rng};
 use std::collections::{HashMap, HashSet};
 
+pub enum LobbyState {
+    Prep(PrepLobbyState),
+    Running(RunningLobbyState),
+    // terminated is scheduled for clean up
+    Terminated,
+}
+
 // lobby parameters
 #[derive(Default)]
 pub struct PrepLobbyState {
@@ -57,8 +64,14 @@ impl From<&PrepLobbyState> for RunningLobbyState {
             let mut snakes = vec![];
 
             for (i, con) in cons.iter().cloned().enumerate() {
+                let i = i as i32;
+                // generate symmetrical placement over Y axis
+                // leave one empty cell between snakes: | | | |
+                let x_offset = if i % 2 == 0 { 0 - i } else { 0 + i + 1 };
+                let y_offset = 3;
+
                 let sections = Sections::from_directions(
-                    Pos::new(i as _, 0),
+                    Pos::new(x_offset, y_offset),
                     (0..3).into_iter().map(|_| Direction::Up),
                 );
 
@@ -75,7 +88,17 @@ impl From<&PrepLobbyState> for RunningLobbyState {
 
         let foods = Foods::default();
 
-        let boundaries = domain::Pos::new(0, 0).boundaries_in_radius(10, 10);
+        /* ensure enough space for placements */
+        // 1 => 2
+        // 2 => 4
+        // 3 => 4
+        // 4 => 6
+        // 5 => 6
+        // ...
+        let min_x_space_radius = cons.len() + 2 - (cons.len() % 2);
+
+        let boundaries =
+            domain::Pos::new(0, 0).boundaries_in_radius(6.max(min_x_space_radius as _), 6);
 
         Self {
             snakes,
@@ -87,13 +110,18 @@ impl From<&PrepLobbyState> for RunningLobbyState {
     }
 }
 
+pub fn leave_food_trace(snake: &domain::Snake, foods: &mut domain::Foods) {
+    foods.extend(snake.iter_vertices().map(domain::Food::from));
+}
+
 impl RunningLobbyState {
     pub fn advance(&mut self) {
         // TODO do not spawn on current snake positions,
         //
         // TODO figure can still spawn on boundaries, seems like by one problem
         fn refill_foods(foods: &mut domain::Foods, boundaries: &domain::Boundaries) {
-            if foods.count() < 30 {
+            // TODO use config value after Env::current() is optimized
+            if foods.count() < 10 {
                 use strum::IntoEnumIterator;
                 let figures = domain::figures::Figures::iter();
 
@@ -134,17 +162,13 @@ impl RunningLobbyState {
                 .map(|(_, snake)| snake.clone())
                 .collect::<Vec<_>>();
 
-            fn snake_to_food_trace(foods: &mut domain::Foods, snake: &mut domain::Snake) {
-                foods.extend(snake.iter_vertices().map(domain::Food::from));
-            }
-
             match snake.advance(&mut self.foods, other_snakes.as_slice(), &self.boundaries) {
                 AdvanceResult::Success => {}
                 AdvanceResult::BitYaSelf
                 | AdvanceResult::BitSomeone
                 | AdvanceResult::OutOfBounds => {
                     rm.push(i);
-                    snake_to_food_trace(&mut self.foods, snake);
+                    leave_food_trace(snake, &mut self.foods);
                 }
             }
         }
@@ -173,14 +197,10 @@ impl RunningLobbyState {
     // no join_con because joining midgame is forbidden
 
     pub fn remove_con(&mut self, con: &Con) {
+        if let Some(snake) = self.snakes.get(con) {
+            leave_food_trace(snake, &mut self.foods);
+        }
         self.cons.remove(con);
         self.snakes.remove(con);
     }
-}
-
-pub enum LobbyState {
-    Prep(PrepLobbyState),
-    Running(RunningLobbyState),
-    // terminated is scheduled for clean up
-    Terminated,
 }
