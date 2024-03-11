@@ -15,7 +15,7 @@ spec:
       containers:
       - name: be
         # TODO
-        # image: registry.digitalocean.com/hort/snake_be:0.1
+        # image: registry.digitalocean.com/snake/snake_be:latest
         image: snake_be:0.1
         ports:
         - name: http
