@@ -1,19 +1,15 @@
 // Server and router definition and tests
 //
 
-#![allow(unused)]
-
 use crate::conf;
-use hyper::StatusCode;
-use std::sync::Arc;
 
 pub type ServerOutput = hyper::Result<()>;
 type Server = std::pin::Pin<Box<dyn std::future::Future<Output = ServerOutput> + Send>>;
 
 pub struct Application {
+    server: Server,
     host: String,
     port: u16,
-    server: Server,
 }
 
 impl Application {
@@ -49,33 +45,27 @@ impl Application {
 }
 
 mod routing {
-    use super::*;
+    use crate::routes::*;
     use axum::routing::Router;
+    #[allow(unused_imports)]
     use axum::routing::{get, post};
+    #[allow(unused_imports)]
+    use static_routes::{Get, Post};
+    use tower_http::{add_extension::AddExtensionLayer, compression::CompressionLayer};
 
     mod routes {
-        use super::*;
+        use hyper::StatusCode;
+
         pub async fn health() -> StatusCode {
             StatusCode::OK
         }
     }
 
-    use std::sync::Arc;
-    use tower_http::{
-        add_extension::AddExtensionLayer,
-        compression::CompressionLayer,
-        trace::{DefaultMakeSpan, DefaultOnRequest, DefaultOnResponse, TraceLayer},
-        LatencyUnit, ServiceBuilderExt,
-    };
-
     pub fn router(conf: crate::conf::Conf) -> Router {
-        use crate::routes::*;
-        use static_routes::{Get, Post};
-
         let routes = static_routes::routes().api;
 
         let api_router = Router::new()
-            .route(routes.health_check.get().postfix(), get(health_check))
+            .route(routes.health_check.get().postfix(), get(routes::health))
             // TODO investigate why POST on /lobby gives 200
             .route("/snake/ws", get(snake_ws::ws));
 
@@ -165,6 +155,7 @@ pub fn ip_address(h: &hyper::HeaderMap) -> std::net::IpAddr {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use hyper::StatusCode;
 
     pub struct TestApp {
         pub port: u16,
@@ -200,7 +191,7 @@ mod tests {
 
     #[tokio::test]
     async fn spawn_app() {
-        let app = TestApp::spawn().await;
+        let _app = TestApp::spawn().await;
     }
 
     #[tokio::test]

@@ -1,23 +1,18 @@
 // Server and router definition and tests
 //
 
-#![allow(unused)]
-
 use crate::conf::Conf;
 use hyper::StatusCode;
-use std::sync::Arc;
 
 pub type ServerOutput = hyper::Result<()>;
 type Server = std::pin::Pin<Box<dyn std::future::Future<Output = ServerOutput> + Send>>;
 
-pub struct AppState {
-    conf: Conf,
-}
-
 pub struct Application {
-    host: String,
-    port: u16,
     server: Server,
+    #[cfg(test)]
+    host: String,
+    #[cfg(test)]
+    port: u16,
 }
 
 impl Application {
@@ -36,7 +31,10 @@ impl Application {
                     .unwrap()
                     .serve(routing::router(conf).into_make_service()),
             ),
+
+            #[cfg(test)]
             port,
+            #[cfg(test)]
             host,
         };
     }
@@ -45,10 +43,12 @@ impl Application {
         self.server
     }
 
+    #[cfg(test)]
     pub fn port(&self) -> u16 {
         self.port
     }
 
+    #[cfg(test)]
     pub fn host(&self) -> &str {
         &self.host
     }
@@ -61,25 +61,23 @@ mod routing {
     use tower_http::add_extension::AddExtensionLayer;
 
     mod routes {
+        use crate::conf::Conf;
+        use axum::{response::IntoResponse, Extension};
+
         pub mod fallback {
-            use std::io::Read;
-
-            use axum::{body::HttpBody, response::IntoResponse, Extension};
-
-            use crate::conf::Conf;
+            use super::*;
             use crate::serve_files::*;
+            use std::io::Read;
 
             pub async fn fallback(
                 uri: axum::http::Uri,
-                Extension(cache): Extension<crate::serve_files::Cache>,
+                Extension(cache): Extension<Cache>,
                 Extension(conf): Extension<Conf>,
             ) -> axum::response::Response {
                 let request_path = {
                     let request_path = uri.to_string();
                     request_path.trim_start_matches('/').trim().to_string()
                 };
-
-                use crate::conf;
 
                 if let Some(file) = cache.get_request_path(&request_path).await {
                     tracing::info!("cache hit for request path: {request_path:?}");
@@ -89,7 +87,7 @@ mod routing {
                 let dir = std::path::Path::new(&conf.dir);
                 let file_path = dir.join(request_path.clone());
 
-                let (file_path) = if file_path.is_file() {
+                let file_path = if file_path.is_file() {
                     file_path
                 } else {
                     match &conf.fallback {
@@ -119,12 +117,12 @@ mod routing {
                     None => {
                         tracing::warn!("cache miss on file path: {file_path:?}");
 
-                        let mut file = std::fs::File::open(&file_path).expect("opens when exists");
+                        let file = std::fs::File::open(&file_path).expect("opens when exists");
 
                         let process_file = |mut file: std::fs::File| {
                             let modified = file.metadata().unwrap().modified().unwrap();
                             let mut contents = vec![];
-                            file.read_to_end(&mut contents);
+                            file.read_to_end(&mut contents).unwrap();
                             File {
                                 contents,
                                 path: Box::new(file_path),
@@ -209,7 +207,7 @@ mod tests {
 
     #[tokio::test]
     async fn spawn_app() {
-        let app = TestApp::spawn().await;
+        let _app = TestApp::spawn().await;
     }
 
     #[tokio::test]
