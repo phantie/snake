@@ -1,5 +1,7 @@
 # Snake game
 
+https://github.com/phantie/snake/assets/43893037/1c4605e9-a324-4a5f-9855-e9c0e93c372b
+
 ### Modes
 Frontend self-contains singleplayer mode.\
 Websocket connection to backend enables multiplayer mode.
