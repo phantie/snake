@@ -1,6 +1,6 @@
 # Snake game
 
-https://github.com/phantie/snake/assets/43893037/1c4605e9-a324-4a5f-9855-e9c0e93c372b
+https://github.com/phantie/snake/assets/43893037/2cdbeae7-6fd6-4bb2-97e4-82d1cfe65562
 
 ### Modes
 Frontend self-contains singleplayer mode.\
